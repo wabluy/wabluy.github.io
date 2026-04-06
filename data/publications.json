@@ -1,0 +1,29 @@
+[
+  {
+    "title": "ElasWave: An Elastic-Native System for Scalable Hybrid-Parallel Training",
+    "authors": "X Kang, G Xiang, Y Wang*, H Zhang, Y Fang, Y Zhou, Z Tang, Y Lv, ...",
+    "venue": "Preprint",
+    "year": 2025,
+    "citations": 0,
+    "links": { "pdf": "https://arxiv.org/abs/2510.00606" },
+    "highlight": true
+  },
+  {
+    "title": "BurstGPT: A Real-world Workload Dataset to Optimize LLM Serving Systems",
+    "authors": "Y Wang, Y Chen, Z Li, X Kang, Y Fang, Y Zhou, Y Zheng, Z Tang, X He, ...",
+    "venue": "KDD",
+    "year": 2025,
+    "citations": 124,
+    "links": { "pdf": "https://arxiv.org/abs/2401.17644" },
+    "highlight": true
+  },
+  {
+    "title": "Fault-Tolerant Hybrid-Parallel Training at Scale with Reliable and Efficient In-memory Checkpointing",
+    "authors": "Y Wang, X Kang, S Shi, X He, Z Tang, X Pan, Y Zheng, X Wu, A C Zhou, ...",
+    "venue": "arXiv preprint",
+    "year": 2024,
+    "citations": 18,
+    "links": { "pdf": "https://arxiv.org/abs/2310.12670" },
+    "highlight": true
+  }
+]
