@@ -111,6 +111,10 @@ ul {
 }
 
 .theme-toggle {
+  position: fixed;
+  top: 0.7rem;
+  right: 1.5rem;
+  z-index: 200;
   background: none;
   border: none;
   color: var(--text-secondary);
@@ -119,8 +123,6 @@ ul {
   font-size: 0.85rem;
   font-weight: 500;
   padding: 0.2rem 0.5rem;
-  margin-left: 0.5rem;
-  vertical-align: middle;
   transition: color 0.2s ease;
 }
 
