@@ -20,6 +20,7 @@
     <a href="#news">News</a>
     <a href="#projects">Projects</a>
     <a href="#publications">Publications</a>
+    <button class="theme-toggle" id="theme-toggle" aria-label="Toggle dark mode"><i class="fas fa-moon"></i></button>
   </nav>
 
   <main class="container">
@@ -127,5 +128,32 @@
   </main>
 
   <script src="js/main.js"></script>
+  <script>
+    const toggle = document.getElementById('theme-toggle');
+    const icon = toggle.querySelector('i');
+    const saved = localStorage.getItem('theme');
+    if (saved) {
+      document.documentElement.setAttribute('data-theme', saved);
+    }
+    function updateIcon() {
+      const isDark = document.documentElement.getAttribute('data-theme') === 'dark' ||
+        (!document.documentElement.getAttribute('data-theme') && window.matchMedia('(prefers-color-scheme: dark)').matches);
+      icon.className = isDark ? 'fas fa-sun' : 'fas fa-moon';
+    }
+    updateIcon();
+    toggle.addEventListener('click', () => {
+      const current = document.documentElement.getAttribute('data-theme');
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      let next;
+      if (!current) {
+        next = prefersDark ? 'light' : 'dark';
+      } else {
+        next = current === 'dark' ? 'light' : 'dark';
+      }
+      document.documentElement.setAttribute('data-theme', next);
+      localStorage.setItem('theme', next);
+      updateIcon();
+    });
+  </script>
 </body>
 </html>
