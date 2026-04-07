@@ -112,20 +112,20 @@ ul {
 
 .theme-toggle {
   background: none;
-  border: 1px solid var(--border);
-  border-radius: 4px;
+  border: none;
   color: var(--text-secondary);
   cursor: pointer;
-  font-size: 0.95rem;
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  font-weight: 500;
   padding: 0.2rem 0.5rem;
   margin-left: 0.5rem;
   vertical-align: middle;
-  transition: color 0.2s ease, border-color 0.2s ease;
+  transition: color 0.2s ease;
 }
 
 .theme-toggle:hover {
   color: var(--accent);
-  border-color: var(--accent);
 }
 
 /* === Layout === */
