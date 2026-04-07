@@ -25,7 +25,7 @@ document.addEventListener('DOMContentLoaded', () => {
         : paper.title;
 
       const citHtml = paper.citations > 0
-        ? `<span class="citation-badge${paper.citations >= 100 ? ' high' : ''}">${paper.citations} citations</span>`
+        ? `<span class="citation-badge">${paper.citations} citations</span>`
         : '';
 
       const awardHtml = paper.award
