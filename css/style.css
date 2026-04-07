@@ -13,6 +13,20 @@
   --font-body: 'Source Sans 3', 'Segoe UI', system-ui, sans-serif;
 }
 
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1a1a2e;
+    --text: #e0e0e0;
+    --text-secondary: #a0a0b0;
+    --accent: #5dade2;
+    --accent-hover: #85c1e9;
+    --border: #2a2a3e;
+    --card-bg: #222236;
+    --tag-bg: #2a3a50;
+    --tag-text: #85c1e9;
+  }
+}
+
 /* === Reset & Base === */
 *, *::before, *::after {
   box-sizing: border-box;
@@ -355,22 +369,18 @@ a.tag:hover {
   padding: 1px 8px;
   border-radius: 3px;
   font-size: 0.78rem;
-  background: #eef;
+  background: var(--tag-bg);
   color: var(--text-secondary);
   margin-left: 0.3rem;
 }
 
-.citation-badge.high {
-  background: var(--accent);
-  color: white;
-}
 
 .award-badge {
   display: inline-block;
   padding: 1px 8px;
   border-radius: 3px;
   font-size: 0.78rem;
-  background: #eef;
+  background: var(--tag-bg);
   color: var(--text-secondary);
   font-weight: 500;
   margin-right: 0.3rem;
