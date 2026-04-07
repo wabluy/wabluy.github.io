@@ -21,7 +21,7 @@
     <a href="#projects">Projects</a>
     <a href="#publications">Publications</a>
   </nav>
-  <button class="theme-toggle" id="theme-toggle" aria-label="Toggle dark mode">Dark</button>
+  <button class="theme-toggle" id="theme-toggle" aria-label="Toggle dark mode">&#9790;</button>
 
   <main class="container">
     <div class="layout">
@@ -141,7 +141,7 @@
         return window.matchMedia('(prefers-color-scheme: dark)').matches;
       }
       function updateLabel() {
-        toggle.textContent = isDark() ? 'Light' : 'Dark';
+        toggle.textContent = isDark() ? '\u2600' : '\u263E';
       }
       updateLabel();
       toggle.addEventListener('click', function() {
