@@ -2,7 +2,7 @@ document.addEventListener('DOMContentLoaded', () => {
   fetch('data/publications.json?v=20260826b')
     .then(res => res.json())
     .then(data => {
-      renderPublications(data);
+      renderPublications(data.slice(0, 3));
     });
 
   function boldAuthor(authors) {
