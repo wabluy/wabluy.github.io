@@ -1,11 +1,46 @@
 [
   {
+    "title": "Zellige: Moldable Sequence Placement for Mixed Image-Video DiT Training",
+    "authors": "G Xiang, X Kang, M Zhao, Y Wang, S Shi, L Zhang, X Chu",
+    "venue": "arXiv preprint",
+    "year": 2026,
+    "citations": 0,
+    "links": {
+      "pdf": "https://arxiv.org/abs/2608.01150"
+    },
+    "highlight": true
+  },
+  {
+    "title": "Xema: Efficient Diffusion Serving through Fine-Grained Memory Management and Auto-Configuration",
+    "authors": "X Kang, G Xiang, S Li, Y Wang, S Shi, L Zhang, X Chu",
+    "venue": "arXiv preprint",
+    "year": 2026,
+    "citations": 1,
+    "links": {
+      "pdf": "https://arxiv.org/abs/2607.11136"
+    },
+    "highlight": true
+  },
+  {
+    "title": "KernelFlume: Elastic Core-Attention Scaling for Agentic Long-Context Decoding",
+    "authors": "G Xiang, X Kang, L Zhang, W Lin, S Shi, Y Wang, X Chu",
+    "venue": "arXiv preprint",
+    "year": 2026,
+    "citations": 1,
+    "links": {
+      "pdf": "https://arxiv.org/abs/2606.29207"
+    },
+    "highlight": true
+  },
+  {
     "title": "ElasWave: An Elastic-Native System for Scalable Hybrid-Parallel Training",
     "authors": "X Kang, G Xiang, Y Wang*, H Zhang, Y Fang, Y Zhou, Z Tang, Y Lv, ...",
     "venue": "Preprint",
     "year": 2025,
-    "citations": 0,
-    "links": { "pdf": "https://arxiv.org/abs/2510.00606" },
+    "citations": 6,
+    "links": {
+      "pdf": "https://arxiv.org/abs/2510.00606"
+    },
     "highlight": true
   },
   {
@@ -13,8 +48,10 @@
     "authors": "Y Wang, Y Chen, Z Li, X Kang, Y Fang, Y Zhou, Y Zheng, Z Tang, X He, ...",
     "venue": "KDD",
     "year": 2025,
-    "citations": 124,
-    "links": { "pdf": "https://arxiv.org/abs/2401.17644" },
+    "citations": 219,
+    "links": {
+      "pdf": "https://arxiv.org/abs/2401.17644"
+    },
     "highlight": true
   },
   {
@@ -22,8 +59,10 @@
     "authors": "Y Wang, X Kang, S Shi, X He, Z Tang, X Pan, Y Zheng, X Wu, A C Zhou, ...",
     "venue": "arXiv preprint",
     "year": 2024,
-    "citations": 18,
-    "links": { "pdf": "https://arxiv.org/abs/2310.12670" },
+    "citations": 21,
+    "links": {
+      "pdf": "https://arxiv.org/abs/2310.12670"
+    },
     "highlight": true
   }
 ]
