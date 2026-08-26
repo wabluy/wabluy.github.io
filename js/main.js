@@ -2,8 +2,7 @@ document.addEventListener('DOMContentLoaded', () => {
   fetch('data/publications.json')
     .then(res => res.json())
     .then(data => {
-      const papers = data.sort((a, b) => b.year - a.year || b.citations - a.citations);
-      renderPublications(papers);
+      renderPublications(data);
     });
 
   function boldAuthor(authors) {
