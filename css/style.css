@@ -184,6 +184,8 @@ ul {
 }
 
 .sidebar-title {
+  display: inline-block;
+  text-align: left;
   font-size: 0.9rem;
   color: var(--text-secondary);
   line-height: 1.5;
