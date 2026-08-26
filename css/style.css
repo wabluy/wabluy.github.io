@@ -153,18 +153,21 @@ ul {
 }
 
 .profile-photo img {
-  width: 160px;
-  height: 160px;
-  border-radius: 50%;
+  display: block;
+  width: 180px;
+  height: 240px;
+  margin: 0 auto;
+  border-radius: 12px;
   object-fit: cover;
+  object-position: center;
   border: 3px solid var(--border);
 }
 
 .photo-fallback {
   display: none;
-  width: 160px;
-  height: 160px;
-  border-radius: 50%;
+  width: 180px;
+  height: 240px;
+  border-radius: 12px;
   background: linear-gradient(135deg, var(--accent), var(--accent-hover));
   color: white;
   font-size: 2.5rem;
@@ -449,7 +452,8 @@ a.tag:hover {
   .profile-photo img,
   .photo-fallback {
     width: 120px;
-    height: 120px;
+    height: 160px;
+    border-radius: 10px;
   }
 
   .sidebar-name {
