@@ -1,5 +1,5 @@
 document.addEventListener('DOMContentLoaded', () => {
-  fetch('data/publications.json')
+  fetch('data/publications.json?v=20260826')
     .then(res => res.json())
     .then(data => {
       renderPublications(data);
