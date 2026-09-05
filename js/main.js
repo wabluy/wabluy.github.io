@@ -1,56 +1,237 @@
-document.addEventListener('DOMContentLoaded', () => {
-  fetch('data/publications.json?v=20260826b')
-    .then(res => res.json())
-    .then(data => {
-      renderPublications(data.slice(0, 3));
-    });
-
-  function boldAuthor(authors) {
-    return authors.replace(/Y Wang\*/g, '<strong>Yuxin Wang*</strong>')
-                  .replace(/Y Wang(?!\*)/g, '<strong>Yuxin Wang</strong>');
-  }
-
-  function renderPublications(papers) {
-    const container = document.getElementById('pub-list');
-    container.innerHTML = '';
-
-    papers.forEach((paper, idx) => {
-      const entry = document.createElement('div');
-      entry.className = 'pub-entry';
-
-      const link = paper.links.pdf || paper.links.code || paper.links.project || '';
-      const titleHtml = link
-        ? `<a href="${link}" target="_blank" rel="noopener">${paper.title}</a>`
-        : paper.title;
-
-      const citHtml = paper.citations > 0
-        ? `<span class="citation-badge">${paper.citations} citations</span>`
-        : '';
-
-      const awardHtml = paper.award
-        ? `<span class="award-badge">${paper.award}</span>`
-        : '';
-
-      let linksHtml = '';
-      if (paper.links.pdf) {
-        linksHtml += `<a class="pub-link" href="${paper.links.pdf}" target="_blank" rel="noopener">paper</a>`;
-      }
-      if (paper.links.code) {
-        linksHtml += `<a class="pub-link" href="${paper.links.code}" target="_blank" rel="noopener">code</a>`;
-      }
-
-      entry.innerHTML = `
-        <div>
-          <span class="pub-number">${idx + 1}.</span>
-          <span class="pub-title-text">${titleHtml}</span>
-          ${awardHtml}${citHtml}
-        </div>
-        <div class="pub-authors">${boldAuthor(paper.authors)}</div>
-        <div class="pub-venue-line">In <em>${paper.venue}</em>, ${paper.year}.</div>
-        ${linksHtml ? `<div class="pub-links">${linksHtml}</div>` : ''}
-      `;
-
-      container.appendChild(entry);
-    });
-  }
+const toggle = document.getElementById('theme-toggle');
+function updateThemeLabel() {
+  const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+  const label = document.documentElement.lang === 'zh-CN'
+    ? `切换到${next === 'light' ? '浅色' : '深色'}主题`
+    : `Switch to ${next} theme`;
+  toggle.setAttribute('aria-label', label);
+  toggle.title = label;
+}
+updateThemeLabel();
+document.addEventListener('languagechange', updateThemeLabel);
+toggle.addEventListener('click', () => {
+  const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+  document.documentElement.dataset.theme = next;
+  try { localStorage.setItem('theme', next); } catch {}
+  updateThemeLabel();
 });
+
+const navLinks = [...document.querySelectorAll('nav a')];
+const disclosures = [...document.querySelectorAll('.section-disclosure')];
+const phoneLayout = window.matchMedia('(max-width: 600px)');
+let showingHomeDefaults = true;
+function updateNavigation() {
+  const active = disclosures.find(section => section.open)?.id || 'about';
+  for (const link of navLinks) {
+    if (link.getAttribute('href') === `#${active}`) link.setAttribute('aria-current', 'location');
+    else link.removeAttribute('aria-current');
+  }
+}
+function openSection(target, fromHome = false) {
+  showingHomeDefaults = fromHome;
+  for (const section of disclosures) if (section !== target) section.open = false;
+  if (target) target.open = true;
+  updateNavigation();
+}
+function followHash(hash, scroll = true) {
+  const target = document.getElementById(hash.slice(1) || 'top');
+  const defaultSection = phoneLayout.matches ? null : document.getElementById('news');
+  if (!target) {
+    openSection(defaultSection, true);
+    return;
+  }
+  const section = target.closest('.section-disclosure');
+  openSection(section || defaultSection, !section);
+  if (scroll) requestAnimationFrame(() => target.scrollIntoView({ block: 'start' }));
+}
+for (const section of disclosures) {
+  section.addEventListener('toggle', () => {
+    if (section.open) {
+      // Also supports browsers without native exclusive <details> groups.
+      for (const other of disclosures) if (other !== section) other.open = false;
+    }
+    updateNavigation();
+  });
+  section.querySelector('summary').addEventListener('click', event => {
+    event.preventDefault();
+    openSection(section.open ? null : section);
+  });
+}
+for (const link of [...navLinks, ...document.querySelectorAll('a[href="#top"], .skip-link')]) {
+  link.addEventListener('click', event => {
+    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    event.preventDefault();
+    const hash = link.getAttribute('href');
+    if (location.hash !== hash) history.pushState(null, '', hash);
+    followHash(hash);
+  });
+}
+window.addEventListener('hashchange', () => followHash(location.hash));
+phoneLayout.addEventListener('change', () => {
+  if (showingHomeDefaults) followHash(location.hash, false);
+});
+followHash(location.hash, Boolean(location.hash));
+
+const previewClosers = [];
+function createHoverPreview(root, trigger, media) {
+  let pinned = false;
+  let hovered = false;
+  let focused = false;
+  let dismissed = false;
+
+  function updatePreview() {
+    const open = media.matches && (pinned || (!dismissed && (hovered || focused)));
+    if (open && root.dataset.open !== 'true') {
+      for (const close of previewClosers) if (close !== closePreview) close();
+    }
+    root.dataset.open = String(open);
+    trigger.setAttribute('aria-expanded', String(open));
+  }
+  function closePreview() {
+    pinned = hovered = focused = false;
+    dismissed = true;
+    updatePreview();
+  }
+  root.addEventListener('pointerenter', event => {
+    if (event.pointerType !== 'mouse' || !media.matches) return;
+    hovered = true;
+    dismissed = false;
+    updatePreview();
+  });
+  root.addEventListener('pointerleave', () => {
+    hovered = false;
+    updatePreview();
+  });
+  trigger.addEventListener('focus', () => {
+    focused = trigger.matches(':focus-visible');
+    if (focused) dismissed = false;
+    updatePreview();
+  });
+  root.addEventListener('focusout', event => {
+    if (!root.contains(event.relatedTarget)) closePreview();
+  });
+  trigger.addEventListener('click', () => {
+    if (!media.matches) return;
+    pinned = !pinned;
+    dismissed = !pinned;
+    updatePreview();
+  });
+  document.addEventListener('pointerdown', event => {
+    if (!root.contains(event.target)) closePreview();
+  });
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape' && root.dataset.open === 'true') {
+      event.preventDefault();
+      closePreview();
+    }
+  });
+  media.addEventListener('change', closePreview);
+  previewClosers.push(closePreview);
+  updatePreview();
+}
+const petCard = document.querySelector('.pet-card');
+const compactProfile = window.matchMedia('(width < 1100px)');
+const petButton = petCard.querySelector('.pet-toggle');
+const petPhoto = petCard.querySelector('.pet-photo');
+let catHovered = false;
+let catFocused = false;
+let catPointer = null;
+let catInteracting = false;
+let activeCatControl = null;
+const isCatControl = control => control === petButton || (!compactProfile.matches && control === petPhoto);
+const catControl = () => activeCatControl || petButton;
+function updateCatInteraction() {
+  const active = catHovered || catFocused || catPointer !== null;
+  petCard.dataset.open = String(active && compactProfile.matches);
+  if (compactProfile.matches) petButton.setAttribute('aria-expanded', String(active));
+  else petButton.removeAttribute('aria-expanded');
+  petCard.dataset.interacting = String(active);
+  if (active === catInteracting) return;
+  catInteracting = active;
+  if (active) {
+    for (const close of previewClosers) if (close !== closeCatInteraction) close();
+  }
+  petCard.dispatchEvent(new Event(active ? 'catpreviewstart' : 'catpreviewend'));
+}
+function closeCatInteraction() {
+  catHovered = catFocused = false;
+  catPointer = null;
+  activeCatControl = null;
+  updateCatInteraction();
+}
+for (const control of [petButton, petPhoto]) {
+  control.addEventListener('pointerenter', event => {
+    if (!isCatControl(control) || event.pointerType !== 'mouse') return;
+    activeCatControl = control;
+    catHovered = true;
+    updateCatInteraction();
+  });
+  control.addEventListener('pointerleave', () => {
+    if (control === catControl()) closeCatInteraction();
+  });
+  control.addEventListener('pointerdown', event => {
+    if (!isCatControl(control) || event.button !== 0) return;
+    activeCatControl = control;
+    catPointer = event.pointerId;
+    catFocused = false;
+    updateCatInteraction();
+  });
+  control.addEventListener('focus', () => {
+    if (!isCatControl(control)) return;
+    activeCatControl = control;
+    catFocused = catPointer === null && !catHovered && control.matches(':focus-visible');
+    updateCatInteraction();
+  });
+  control.addEventListener('blur', closeCatInteraction);
+}
+document.addEventListener('pointerup', event => {
+  if (event.pointerId !== catPointer) return;
+  catPointer = null;
+  catFocused = false;
+  if (event.pointerType !== 'mouse') catHovered = false;
+  updateCatInteraction();
+}, true);
+document.addEventListener('pointercancel', event => {
+  if (event.pointerId === catPointer) closeCatInteraction();
+}, true);
+document.addEventListener('pointermove', event => {
+  if (event.pointerId !== catPointer) return;
+  const bounds = catControl().getBoundingClientRect();
+  if (event.clientX < bounds.left || event.clientX > bounds.right ||
+      event.clientY < bounds.top || event.clientY > bounds.bottom) closeCatInteraction();
+}, { passive: true });
+document.addEventListener('pointerdown', event => {
+  if (!petCard.contains(event.target) && !petButton.contains(event.target)) closeCatInteraction();
+});
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape') closeCatInteraction();
+});
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) closeCatInteraction();
+});
+window.addEventListener('blur', closeCatInteraction);
+compactProfile.addEventListener('change', closeCatInteraction);
+previewClosers.push(closeCatInteraction);
+updateCatInteraction();
+function updatePetPlacement() {
+  if (compactProfile.matches) {
+    petCard.prepend(petButton);
+    document.querySelector('.header-actions').insertBefore(petCard, toggle);
+  } else {
+    document.querySelector('.header-actions').insertBefore(petButton, toggle);
+    document.querySelector('.sidebar').append(petCard);
+  }
+}
+compactProfile.addEventListener('change', updatePetPlacement);
+updatePetPlacement();
+createHoverPreview(
+  document.querySelector('.location'),
+  document.querySelector('.location-toggle'),
+  window.matchMedia('(max-width: 600px)')
+);
+const backgroundDetails = document.querySelector('.background-details');
+function updateBackgroundVisibility() {
+  backgroundDetails.open = !phoneLayout.matches;
+}
+phoneLayout.addEventListener('change', updateBackgroundVisibility);
+updateBackgroundVisibility();

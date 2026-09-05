@@ -1,169 +1,132 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Yuxin Wang - Distributed Systems Expert at ModelBest</title>
-  <meta name="description" content="I am Yuxin Wang, a distributed systems expert at ModelBest. I architect AI Infra platforms and research self-evolving systems.">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Crimson+Text:wght@400;600;700&family=Source+Sans+3:wght@300;400;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/academicons/1.9.4/css/academicons.min.css">
-  <link rel="stylesheet" href="css/style.css?v=20260905bobo5">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark light">
+  <title>Yuxin Wang — AI Infrastructure &amp; Self-Evolving Systems</title>
+  <meta name="description" content="Yuxin Wang works as a distributed systems expert at ModelBest, building AI infrastructure and exploring self-evolving systems.">
+  <script>try{const t=localStorage.getItem('theme');if(t==='light'||t==='dark')document.documentElement.dataset.theme=t;}catch{}</script>
+  <link rel="stylesheet" href="css/style.css?v=20260905-desktop-cat-icon">
+  <link rel="stylesheet" href="css/cat-walk.css?v=20260905-no-desktop-line">
+  <script src="js/i18n.js?v=20260905-bilingual-v3" defer></script>
+  <script src="js/main.js?v=20260905-desktop-cat-icon" defer></script>
+  <script src="js/cat-walk.js?v=20260905-bobo-deep-orange-random" defer></script>
 </head>
-<body>
-
-  <!-- Navigation -->
-  <nav class="topnav">
-    <a href="#about">About Me</a>
-    <a href="#news">News</a>
-    <a href="#projects">Projects</a>
-    <a href="#publications">Publications</a>
-  </nav>
-  <button class="theme-toggle" id="theme-toggle" aria-label="Toggle dark mode">&#9790;</button>
-
-  <main class="container">
-    <div class="layout">
-
-      <!-- Left Sidebar -->
-      <aside class="sidebar">
-        <div class="profile-photo">
-          <img src="assets/photo.jpg?v=20260826circle" alt="Yuxin Wang" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
-          <div class="photo-fallback">YW</div>
-        </div>
-        <h1 class="sidebar-name">Yuxin Wang</h1>
-        <p class="sidebar-title">AI Infra &amp; RSI<br>ModelBest</p>
-        <ul class="sidebar-links">
-          <li><i class="fas fa-map-marker-alt"></i> Hong Kong SAR</li>
-          <li><a href="mailto:yxwang.ele@gmail.com"><i class="fas fa-envelope"></i> Email</a></li>
-          <li><a href="https://scholar.google.com/citations?user=k-evxWgAAAAJ" target="_blank" rel="noopener"><i class="ai ai-google-scholar"></i> Google Scholar</a></li>
-        </ul>
-        <div class="pet-card">
-          <img class="pet-photo" src="assets/bobo.webp?v=20260905photo" alt="BoBO (波波), my cat" width="400" height="400" loading="lazy" decoding="async">
-          <div class="pet-name">BoBO (波波)<br>Cat-in-the-Loop</div>
-        </div>
-      </aside>
-
-      <!-- Right Content -->
-      <div class="content">
-
-        <!-- About -->
-        <section id="about">
-          <p>
-            I currently work as a distributed systems expert at <a href="https://www.modelbest.cn/en/" target="_blank" rel="noopener">ModelBest</a>. I architect AI Infra platforms and research self-evolving systems.
-            Previously, I was an AI Infra researcher at <a href="https://www.huawei.com/en/corporate-information/research-development" target="_blank" rel="noopener">HKRC</a>.<br>
-            I received my Ph.D. in Computer Science from <a href="https://www.hkbu.edu.hk/" target="_blank" rel="noopener">HKBU</a>,
-            supervised by <a href="https://sites.google.com/view/chuxiaowen" target="_blank" rel="noopener">Prof. Xiaowen Chu</a> and <a href="https://amelieczhou.github.io/" target="_blank" rel="noopener">Dr. Amelie Chi Zhou</a>.
-            I was also a visiting student at <a href="https://www.nus.edu.sg/" target="_blank" rel="noopener">NUS</a>,
-            advised by <a href="https://www.comp.nus.edu.sg/~hebs/" target="_blank" rel="noopener">Prof. Bingsheng He</a>.
-            I received my B.Eng. in Electrical Engineering from <a href="https://www.hust.edu.cn/" target="_blank" rel="noopener">HUST</a>.
-          </p>
-          <p>My research focuses on AI Infra platforms and self-evolving systems:</p>
-          <ul>
-            <li><strong>AI Infra Platforms</strong>: architecture and systems optimization for efficient, reliable, and observable large-scale model training and serving.</li>
-            <li><strong>Self-Evolving AI Infra</strong>: AI Infra platforms that autonomously evolve their architecture, capabilities, and optimization strategies over time.</li>
-          </ul>
-        </section>
-
-        <!-- News -->
-        <section id="news">
-          <h2>&#x1F525; News</h2>
-          <ul class="news-list">
-            <li><span class="news-date">[2026.08]</span> Our paper "<a href="https://arxiv.org/abs/2608.01150">Zellige: Moldable Sequence Placement for Mixed Image-Video DiT Training</a>" is now available on arXiv.</li>
-            <li><span class="news-date">[2026.07]</span> Our paper "<a href="https://arxiv.org/abs/2607.11136">Xema: Efficient Diffusion Serving through Fine-Grained Memory Management and Auto-Configuration</a>" is now available on arXiv.</li>
-            <li><span class="news-date">[2026.06]</span> Our paper "<a href="https://arxiv.org/abs/2606.29207">KernelFlume: Elastic Core-Attention Scaling for Agentic Long-Context Decoding</a>" is now available on arXiv.</li>
-            <li><span class="news-date">[2026.05]</span> Our paper "<a href="https://arxiv.org/abs/2605.07443">RcLLM: Accelerating Generative Recommendation via Beyond-Prefix KV Caching</a>" was accepted by ICDCS 2026. Congrats to Zhan!</li>
-            <li><span class="news-date">[2026.05]</span> Our paper "<a href="https://openreview.net/forum?id=cPZepCZlFW">Capturing and Mitigating Gradient Aggregation Errors for Fault-Tolerant Distributed Training</a>" was accepted by ICML 2026. Congrats to Zhenheng!</li>
-            <li><span class="news-date">[2026.04]</span> Our paper "<a href="https://arxiv.org/abs/2502.11058">DreamDDP: Accelerating Data Parallel Distributed LLM Training with Layer-wise Scheduled Partial Synchronization</a>" was accepted by MLSys 2026. Congrats to Zhenheng!</li>
-            <li><span class="news-date">[2026.01]</span> Our paper "<a href="https://arxiv.org/abs/2410.17954">ExpertFlow: Optimized Expert Activation and Token Allocation for Efficient MoE Inference</a>" was accepted by DAC 2026. Congrats to Xin!</li>
-            <li><span class="news-date">[2025.12]</span> Our paper "<a href="https://arxiv.org/abs/2512.21487">Efficient MoE Inference with Fine-Grained Scheduling of Disaggregated Expert Parallelism</a>" is now available on arXiv.</li>
-            <li><span class="news-date">[2025.10]</span> Our paper "<a href="https://arxiv.org/abs/2510.00606">ElasWave: An Elastic-Native System for Scalable Hybrid-Parallel Training</a>" is now available on arXiv.</li>
-
-            <li><span class="news-date">[2025.09]</span> Our paper "<a href="https://arxiv.org/abs/2510.18672">Reasoning Language Model Inference Serving Unveiled: An Empirical Study</a>" was accepted by ICLR 2026. Congrats to Qi!</li>
-            <li><span class="news-date">[2025.05]</span> Our paper "<a href="https://arxiv.org/abs/2401.17644">BurstGPT: A Real-world Workload Dataset to Optimize LLM Serving Systems</a>" was accepted by KDD 2025.</li>
-            <li><span class="news-date">[2025.08]</span> I proposed <a href="https://github.com/vllm-project/vllm/issues/22799">ATTN-FFN Disaggregation</a> and <a href="https://github.com/vllm-project/vllm/issues/27584">Elastic AFD</a> for MoE models in vLLM for efficient DeepSeek-v3/R1 serving. Now advancing as an experimental feature.</li>
-            <li><span class="news-date">[2024.10]</span> Our paper "<a href="https://arxiv.org/abs/2310.12670">Fault-Tolerant Hybrid-Parallel Training at Scale with Reliable and Efficient In-memory Checkpointing</a>" is now available on arXiv.</li>
-            <li><span class="news-date">[2024.06]</span> Our paper on "<a href="https://arxiv.org/abs/2408.14736">Bandwidth-Aware Compression for Communication-Efficient Federated Learning</a>" was accepted by ICPP 2024. Congrats to Zichen!</li>
-          </ul>
-        </section>
-
-        <!-- Open Source Projects -->
-        <section id="projects">
-          <h2>&#x1F4BB; Open Source Projects</h2>
-          <div class="project-list">
-
-            <div class="project-card">
-              <h3><a href="https://github.com/HPMLL/BurstGPT" target="_blank" rel="noopener">BurstGPT</a></h3>
-              <p>The first real-world trace dataset of LLM serving workloads from Azure OpenAI GPT services. Contains 10.31M traces collected over 213 days. Published at <strong>KDD 2025</strong>.</p>
-              <div class="project-tags">
-                <span class="tag">LLM Serving</span>
-                <span class="tag">Dataset</span>
-                <span class="tag">KDD 2025</span>
-              </div>
-            </div>
-
-            <div class="project-card">
-              <h3>AFD &amp; Elastic AFD (vLLM)</h3>
-              <p>Attn-FFN Disaggregation for MoE model inference in vLLM, decoupling Attention and FFN/expert phases for efficient DeepSeek-v3/R1 serving. Elastic AFD further enables dynamic scaling during traffic spikes and node failures.</p>
-              <div class="project-tags">
-                <a class="tag" href="https://github.com/vllm-project/vllm/issues/22799" target="_blank" rel="noopener">RFC: AFD</a>
-                <a class="tag" href="https://github.com/vllm-project/vllm/issues/27584" target="_blank" rel="noopener">RFC: Elastic AFD</a>
-              </div>
-            </div>
-
-            <div class="project-card">
-              <h3>Elastic and Fault-Tolerant EP (vLLM)</h3>
-              <p>Process-level fault tolerance for vLLM distributed inference. Enables fast local recovery (seconds vs. minutes) from GPU/network failures in MoE hybrid-parallel deployments, with fault detection, status reporting, and elastic EP-based device isolation.</p>
-              <div class="project-tags">
-                <a class="tag" href="https://github.com/vllm-project/vllm/issues/27866" target="_blank" rel="noopener">RFC: Fault Tolerance</a>
-              </div>
-            </div>
-
-          </div>
-        </section>
-
-        <!-- Publications -->
-        <section id="publications">
-          <h2>&#x1F4DD; Recent Publications</h2>
-          <div id="pub-list"></div>
-          <p style="margin-top: 1rem; font-size: 0.92rem; color: var(--text-secondary);">
-            My full publication list is available on <a href="https://scholar.google.com/citations?user=k-evxWgAAAAJ" target="_blank" rel="noopener">Google Scholar</a> (1258 citations, August 2026).
-          </p>
-        </section>
-
-        <!-- Footer -->
-        <footer class="footer">
-        </footer>
-
+<body id="top">
+<a class="skip-link" href="#about" data-i18n="skip">Skip to content</a>
+<header class="topbar"><div class="topbar-inner">
+  <a href="#top" class="wordmark" aria-label="Yuxin Wang, back to top" data-i18n-aria-label="homeLabel">yw<span>.</span></a>
+  <nav aria-label="Main navigation" data-i18n-aria-label="navigation"><a href="#about" aria-current="location" data-i18n="navAbout">About</a><a href="#projects" data-i18n="navProjects">Projects</a><a href="#publications" aria-label="Publications" data-i18n-aria-label="navPublications"><span class="nav-label-full" data-i18n="navPublications">Publications</span><span class="nav-label-short" data-i18n="navPapers">Papers</span></a><a href="#news" data-i18n="navUpdates">Updates</a></nav>
+  <div class="header-actions">
+  <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Switch to light theme" title="Switch to light theme"><svg class="sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.4 1.4m11.2 11.2L19 19M5 19l1.4-1.4M17.6 6.4 19 5"/></svg><svg class="moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M20.5 14.4A8.8 8.8 0 0 1 9.6 3.5a8.8 8.8 0 1 0 10.9 10.9Z"/></svg></button>
+  <button class="language-toggle" id="language-toggle" type="button" aria-label="Switch to Chinese" title="Switch to Chinese" lang="zh-CN">中</button>
+  </div>
+</div></header>
+<main class="page-layout">
+  <aside class="sidebar" aria-label="Profile" data-i18n-aria-label="profile">
+    <div class="identity">
+      <img class="profile-photo" src="assets/photo.jpg" alt="Yuxin Wang" data-i18n-alt="name" width="128" height="128" decoding="async">
+      <div class="identity-text"><h1 data-i18n="name">Yuxin Wang</h1><p class="role" data-i18n="role">AI Infra &amp; RSI</p><p class="affiliation"><a href="https://www.modelbest.cn/en/" target="_blank" rel="noopener"><img class="company-icon" src="assets/modelbest-official-icon.png" width="20" height="20" alt=""><span data-i18n="affiliation">ModelBest</span></a></p></div>
+    </div>
+    <div class="profile-contact">
+      <div class="location">
+        <svg class="location-static-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M19 10c0 5-7 11-7 11S5 15 5 10a7 7 0 1 1 14 0Z"/><circle cx="12" cy="10" r="2.5"/></svg><span class="contact-label" data-i18n="location">Beijing China</span>
+        <button class="location-toggle" type="button" aria-label="Location" data-i18n-aria-label="locationLabel" aria-describedby="location-tooltip" aria-controls="location-tooltip" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M19 10c0 5-7 11-7 11S5 15 5 10a7 7 0 1 1 14 0Z"/><circle cx="12" cy="10" r="2.5"/></svg></button>
+        <span class="location-tooltip" id="location-tooltip" role="tooltip" data-i18n="location">Beijing China</span>
+      </div>
+      <a href="mailto:yxwang.ele@gmail.com" aria-label="Email" title="Email" data-i18n-aria-label="email" data-i18n-title="email"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 6 9 7 9-7"/></svg><span class="contact-label" data-i18n="email">Email</span><span class="contact-arrow" aria-hidden="true">↗</span></a>
+      <a href="https://scholar.google.com/citations?user=k-evxWgAAAAJ" target="_blank" rel="noopener" aria-label="Google Scholar" title="Google Scholar" data-i18n-aria-label="scholar" data-i18n-title="scholar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="m2 9 10-5 10 5-10 5L2 9Zm4 2v6c4 3 8 3 12 0v-6M22 9v8"/></svg><span class="contact-label" data-i18n="scholar">Google Scholar</span><span class="contact-arrow" aria-hidden="true">↗</span></a>
+    </div>
+    <div class="pet-card">
+      <button class="pet-toggle" type="button" aria-label="Cat-in-the-Loop" data-i18n-aria-label="catLabel" aria-expanded="false" aria-controls="pet-portrait"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5.3 7.8C4.4 6.1 4.5 3.6 5.4 3.3c.8-.3 2.5.9 3.3 2.2a12.8 12.8 0 0 1 6.6 0c.8-1.3 2.5-2.5 3.3-2.2.9.3 1 2.8.1 4.5 1.8 1.5 2.8 3.6 2.6 5.9-.3 4.6-4.5 7.4-9.3 7.4s-9-2.8-9.3-7.4c-.2-2.3.8-4.4 2.6-5.9Z"/><circle cx="8" cy="12" r="1.1" fill="currentColor" stroke="none"/><circle cx="16" cy="12" r="1.1" fill="currentColor" stroke="none"/><path d="m10.8 15 1.2 1 1.2-1Z" fill="currentColor" stroke="none"/><path d="M9.2 16.4c.6 1.5 2.8 1.5 2.8-.4 0 1.9 2.2 1.9 2.8.4M5.5 15l-2-.3m15 .3 2-.3"/></svg></button>
+      <div class="pet-portrait" id="pet-portrait">
+        <span class="pet-photo"><img src="assets/bobo.webp" alt="BoBo, my cat" data-i18n-alt="catAlt" width="92" height="92" decoding="async"></span>
+        <p class="pet-name" lang="en">BoBo<span class="pet-role">Cat-in-the-Loop</span></p>
       </div>
     </div>
-  </main>
-
-  <script src="js/main.js?v=20260826c"></script>
-  <script>
-    (function() {
-      const toggle = document.getElementById('theme-toggle');
-      const saved = localStorage.getItem('theme');
-      if (saved) {
-        document.documentElement.setAttribute('data-theme', saved);
-      }
-      function isDark() {
-        const t = document.documentElement.getAttribute('data-theme');
-        if (t) return t === 'dark';
-        return window.matchMedia('(prefers-color-scheme: dark)').matches;
-      }
-      function updateLabel() {
-        toggle.textContent = isDark() ? '\u2600' : '\u263E';
-      }
-      updateLabel();
-      toggle.addEventListener('click', function() {
-        var next = isDark() ? 'light' : 'dark';
-        document.documentElement.setAttribute('data-theme', next);
-        localStorage.setItem('theme', next);
-        updateLabel();
-      });
-    })();
-  </script>
+  </aside>
+  <div class="content">
+    <section class="about" id="about" aria-label="About me" data-i18n-aria-label="aboutLabel">
+      <div class="cat-walk" aria-hidden="true"><canvas class="cat-walk-sprite" width="40" height="28"></canvas></div>
+      <p data-i18n="intro">I work as a distributed systems expert at <a href="https://www.modelbest.cn/en/" target="_blank" rel="noopener">ModelBest</a>. I architect and build AI infrastructure, delivering efficient, reliable, and observable systems. I also work on systems that can improve themselves over time.</p>
+      <details class="background-details" open>
+        <summary><span data-i18n="moreBackground">More background</span><span aria-hidden="true">+</span></summary>
+        <p data-i18n="background">Previously, I was a researcher at <a href="https://www.huawei.com/en/corporate-information/research-development" target="_blank" rel="noopener">HKRC</a>, focusing on reliability in hyperscale systems, self-evolving AI infrastructure, and software design for coding agents. I received my Ph.D. in Computer Science from <a href="https://www.hkbu.edu.hk/" target="_blank" rel="noopener">HKBU</a>, supervised by <a href="https://sites.google.com/view/chuxiaowen" target="_blank" rel="noopener">Prof. Xiaowen Chu</a> and <a href="https://amelieczhou.github.io/" target="_blank" rel="noopener">Dr. Amelie Chi Zhou</a>. I was also a visiting student at <a href="https://www.nus.edu.sg/" target="_blank" rel="noopener">NUS</a>, advised by <a href="https://scholar.google.com/citations?user=RogYLKYAAAAJ&amp;hl=en" target="_blank" rel="noopener">Prof. Bingsheng He</a>. I received my B.Eng. in Electrical Engineering from <a href="https://www.hust.edu.cn/" target="_blank" rel="noopener">HUST</a>.</p>
+      </details>
+    </section>
+    <details class="section-disclosure" id="projects" name="homepage-sections">
+      <summary class="section-heading"><h2 id="work-title" data-i18n="projectsHeading">Open source projects</h2><span class="section-toggle" aria-hidden="true">+</span></summary>
+      <div class="section-body" lang="en">
+      <div class="work-list">
+        <article class="work-entry">
+          <h3><a href="https://github.com/HPMLL/BurstGPT" target="_blank" rel="noopener">BurstGPT</a></h3>
+          <p>A real-world view of LLM serving: 10.31 million workload traces from Azure OpenAI services, collected over 213 days.</p>
+          <div class="entry-footer"><span class="entry-meta">KDD 2025</span><a class="resource-link" href="https://github.com/HPMLL/BurstGPT" target="_blank" rel="noopener">Code &amp; dataset <span aria-hidden="true">↗</span></a><a class="resource-link" href="https://arxiv.org/abs/2401.17644" target="_blank" rel="noopener">Paper <span aria-hidden="true">↗</span></a></div>
+        </article>
+        <article class="work-entry">
+          <h3>AFD &amp; Elastic AFD</h3>
+          <p>Disaggregating attention and FFN for efficient MoE inference, with elastic scaling through traffic spikes and node failures.</p>
+          <div class="entry-footer"><span class="entry-meta">vLLM</span><a class="resource-link" href="https://github.com/vllm-project/vllm/issues/22799" target="_blank" rel="noopener">AFD proposal <span aria-hidden="true">↗</span></a><a class="resource-link" href="https://github.com/vllm-project/vllm/issues/27584" target="_blank" rel="noopener">Elastic AFD <span aria-hidden="true">↗</span></a></div>
+        </article>
+        <article class="work-entry">
+          <h3>Elastic &amp; Fault-Tolerant EP</h3>
+          <p>Process-level recovery for distributed MoE inference, combining fault detection, device isolation, and elastic expert parallelism.</p>
+          <div class="entry-footer"><span class="entry-meta">vLLM</span><a class="resource-link" href="https://github.com/vllm-project/vllm/issues/27866" target="_blank" rel="noopener">Fault-tolerance proposal <span aria-hidden="true">↗</span></a></div>
+        </article>
+      </div>
+      </div>
+    </details>
+    <details class="section-disclosure" id="publications" name="homepage-sections">
+      <summary class="section-heading"><h2 id="publications-title" data-i18n="publicationsHeading">Recent publications</h2><span class="section-toggle" aria-hidden="true">+</span></summary>
+      <div class="section-body" lang="en">
+      <div class="publication-list"><article class="publication">
+          <h3><a href="https://arxiv.org/abs/2608.01150" target="_blank" rel="noopener">Zellige: Moldable Sequence Placement for Mixed Image-Video DiT Training</a></h3>
+          <p class="pub-authors">G Xiang, X Kang, M Zhao, <strong>Yuxin Wang</strong>, S Shi, L Zhang, X Chu</p>
+          <div class="entry-footer"><span class="entry-meta">arXiv preprint · 2026</span><a class="resource-link" href="https://arxiv.org/abs/2608.01150" target="_blank" rel="noopener">Paper <span aria-hidden="true">↗</span></a></div>
+        </article>
+<article class="publication">
+          <h3><a href="https://arxiv.org/abs/2606.29207" target="_blank" rel="noopener">KernelFlume: Elastic Core-Attention Scaling for Agentic Long-Context Decoding</a></h3>
+          <p class="pub-authors">G Xiang, X Kang, L Zhang, W Lin, S Shi, <strong>Yuxin Wang</strong>, X Chu</p>
+          <div class="entry-footer"><span class="entry-meta">arXiv preprint · 2026</span><a class="resource-link" href="https://arxiv.org/abs/2606.29207" target="_blank" rel="noopener">Paper <span aria-hidden="true">↗</span></a></div>
+        </article>
+<article class="publication">
+          <h3><a href="https://arxiv.org/abs/2401.17644" target="_blank" rel="noopener">BurstGPT: A Real-world Workload Dataset to Optimize LLM Serving Systems</a></h3>
+          <p class="pub-authors"><strong>Yuxin Wang</strong>, Y Chen, Z Li, X Kang, Y Fang, Y Zhou, Y Zheng, Z Tang, X He, ...</p>
+          <div class="entry-footer"><span class="entry-meta">KDD · 2025</span><a class="resource-link" href="https://arxiv.org/abs/2401.17644" target="_blank" rel="noopener">Paper <span aria-hidden="true">↗</span></a></div>
+        </article>
+<article class="publication">
+          <h3><a href="https://arxiv.org/abs/2310.12670" target="_blank" rel="noopener">Fault-Tolerant Hybrid-Parallel Training at Scale with Reliable and Efficient In-memory Checkpointing</a></h3>
+          <p class="pub-authors"><strong>Yuxin Wang</strong>, X Kang, S Shi, X He, Z Tang, X Pan, Y Zheng, X Wu, A C Zhou, ...</p>
+          <div class="entry-footer"><span class="entry-meta">arXiv preprint · 2024</span><a class="resource-link" href="https://arxiv.org/abs/2310.12670" target="_blank" rel="noopener">Paper <span aria-hidden="true">↗</span></a></div>
+        </article></div>
+      <div class="publication-list additional-publications"><article class="publication">
+          <h3><a href="https://arxiv.org/abs/2607.11136" target="_blank" rel="noopener">Xema: Efficient Diffusion Serving through Fine-Grained Memory Management and Auto-Configuration</a></h3>
+          <p class="pub-authors">X Kang, G Xiang, S Li, <strong>Yuxin Wang</strong>, S Shi, L Zhang, X Chu</p>
+          <div class="entry-footer"><span class="entry-meta">arXiv preprint · 2026</span><a class="resource-link" href="https://arxiv.org/abs/2607.11136" target="_blank" rel="noopener">Paper <span aria-hidden="true">↗</span></a></div>
+        </article>
+<article class="publication">
+          <h3><a href="https://arxiv.org/abs/2605.07443" target="_blank" rel="noopener">RcLLM: Accelerating Generative Recommendation via Beyond-Prefix KV Caching</a></h3>
+          <p class="pub-authors">Z Zhao, <strong>Yuxin Wang</strong>, A C Zhou</p>
+          <div class="entry-footer"><span class="entry-meta">ICDCS · 2026</span><a class="resource-link" href="https://arxiv.org/abs/2605.07443" target="_blank" rel="noopener">Paper <span aria-hidden="true">↗</span></a></div>
+        </article>
+<article class="publication">
+          <h3><a href="https://arxiv.org/abs/2510.00606" target="_blank" rel="noopener">ElasWave: An Elastic-Native System for Scalable Hybrid-Parallel Training</a></h3>
+          <p class="pub-authors">X Kang, G Xiang, <strong>Yuxin Wang*</strong>, H Zhang, Y Fang, Y Zhou, Z Tang, Y Lv, ...</p>
+          <div class="entry-footer"><span class="entry-meta">Preprint · 2025</span><a class="resource-link" href="https://arxiv.org/abs/2510.00606" target="_blank" rel="noopener">Paper <span aria-hidden="true">↗</span></a></div>
+        </article></div>
+      <div class="publication-reference"><a href="https://scholar.google.com/citations?user=k-evxWgAAAAJ" target="_blank" rel="noopener">Full list on Google Scholar <span aria-hidden="true">↗</span></a><p>1,258 citations · August 2026</p></div>
+      </div>
+    </details>
+    <details class="section-disclosure" id="news" name="homepage-sections">
+      <summary class="section-heading"><h2 id="news-title" data-i18n="updatesHeading">Updates</h2><span class="section-toggle" aria-hidden="true">+</span></summary>
+      <div class="section-body" lang="en">
+      <ul class="news-list"><li><time datetime="2026-08">2026.08</time><div><a href="https://arxiv.org/abs/2608.01150">Zellige</a> is available on arXiv.</div></li><li><time datetime="2026-07">2026.07</time><div><a href="https://arxiv.org/abs/2607.11136">Xema</a> is available on arXiv.</div></li><li><time datetime="2026-06">2026.06</time><div><a href="https://arxiv.org/abs/2606.29207">KernelFlume</a> is available on arXiv.</div></li><li><time datetime="2026-05">2026.05</time><div><a href="https://arxiv.org/abs/2605.07443">RcLLM</a> was accepted at ICDCS 2026. Congrats to Zhan!</div></li></ul>
+      <ul class="news-list older-updates"><li><time datetime="2026-05">2026.05</time><div>Our paper on <a href="https://openreview.net/forum?id=cPZepCZlFW">gradient aggregation errors in fault-tolerant training</a> was accepted at ICML 2026. Congrats to Zhenheng!</div></li><li><time datetime="2026-04">2026.04</time><div><a href="https://arxiv.org/abs/2502.11058">DreamDDP</a> was accepted at MLSys 2026. Congrats to Zhenheng!</div></li><li><time datetime="2026-01">2026.01</time><div><a href="https://arxiv.org/abs/2410.17954">ExpertFlow</a> was accepted at DAC 2026. Congrats to Xin!</div></li><li><time datetime="2025-12">2025.12</time><div>Our paper on <a href="https://arxiv.org/abs/2512.21487">disaggregated MoE inference</a> is available on arXiv.</div></li><li><time datetime="2025-10">2025.10</time><div><a href="https://arxiv.org/abs/2510.00606">ElasWave</a> is available on arXiv.</div></li><li><time datetime="2025-09">2025.09</time><div>Our paper on <a href="https://arxiv.org/abs/2510.18672">serving reasoning models</a> was accepted at ICLR 2026. Congrats to Qi!</div></li><li><time datetime="2025-08">2025.08</time><div>I proposed <a href="https://github.com/vllm-project/vllm/issues/22799">ATTN-FFN Disaggregation</a> and <a href="https://github.com/vllm-project/vllm/issues/27584">Elastic AFD</a> for MoE models in vLLM for efficient DeepSeek-v3/R1 serving. Now advancing as an experimental feature.</div></li><li><time datetime="2025-05">2025.05</time><div><a href="https://arxiv.org/abs/2401.17644">BurstGPT</a> was accepted at KDD 2025.</div></li><li><time datetime="2024-10">2024.10</time><div>Our paper on <a href="https://arxiv.org/abs/2310.12670">in-memory checkpointing for fault-tolerant training</a> is available on arXiv.</div></li><li><time datetime="2024-06">2024.06</time><div>Our work on <a href="https://arxiv.org/abs/2408.14736">bandwidth-aware compression for federated learning</a> was accepted at ICPP 2024. Congrats to Zichen!</div></li></ul>
+      </div>
+    </details>
+    <footer><a href="#top"><span data-i18n="backTop">Back to top</span> <span aria-hidden="true">↑</span></a></footer>
+  </div>
+</main>
 </body>
 </html>

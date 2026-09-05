@@ -1,0 +1,32 @@
+.about { position: relative; scroll-margin-top: 24px; }
+.cat-walk {
+  --cat-sprite-width: 64px;
+  position: absolute;
+  inset-inline: 0;
+  bottom: 100%;
+  height: calc(var(--cat-sprite-width) * .7);
+  z-index: 2;
+  pointer-events: none;
+  visibility: hidden;
+  opacity: 0;
+}
+.cat-walk.is-active { visibility: visible; opacity: 1; }
+.cat-walk-sprite {
+  position: absolute;
+  left: 0;
+  bottom: calc(var(--cat-sprite-width) * -.025);
+  display: block;
+  width: var(--cat-sprite-width);
+  height: calc(var(--cat-sprite-width) * .7);
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  pointer-events: none;
+}
+.cat-walk.is-active .cat-walk-sprite { will-change: transform; }
+@media (width < 1100px) {
+  .about { scroll-margin-top: 56px; }
+  .cat-walk { --cat-sprite-width: 56px; bottom: calc(100% + 32px); }
+}
+@media print {
+  .cat-walk { display: none; }
+}
