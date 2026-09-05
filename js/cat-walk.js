@@ -54,7 +54,8 @@
   let totalDuration = 0;
   let playStarted = null;
   let pendingInput = null;
-  const timing = { pet: 1500, tail: 1800, grab: 1200, pounce: 900 };
+  const timing = { pet: 1500, tail: 1800, grab: 1200, pounce: 1300 };
+  const pounceTiming = { takeoff: .48, landing: .86 };
   let playKind = 'pounce';
   let playOrigin = 0;
   let playTarget = 0;
@@ -200,9 +201,10 @@
     box(29 + dx, 19 + dy, 1, 1, color.orange);
     box(30 + dx, 19 + dy, 1, 1, `${color.orange}55`);
     box(29 + dx, 20 + dy, 1, 1, `${color.orange}44`);
-    if (expression === 'normal') {
+    if (expression === 'normal' || expression === 'aim') {
+      const pupil = expression === 'aim' && mouth > .35 ? 4 : 3;
       for (const eyeX of [25, 34]) {
-        box(eyeX + dx, 13 + dy, 3, 3, color.eye);
+        box(eyeX + dx, 13 + dy - (pupil === 4 ? 1 : 0), pupil, pupil, color.eye);
         box(eyeX + dx, 13 + dy, 1, 1, color.cream);
       }
       box(31 + dx, 19 + dy, 1, 1, color.outline);
@@ -382,16 +384,35 @@
     head(0, Math.round(raised), 'pet');
   }
 
+  function pouncePose(progress) {
+    const clamp = t => Math.max(0, Math.min(1, t));
+    const smooth = t => t * t * (3 - 2 * t);
+    const prep = clamp(progress / pounceTiming.takeoff);
+    const flight = clamp((progress - pounceTiming.takeoff) / (pounceTiming.landing - pounceTiming.takeoff));
+    const settling = clamp((progress - pounceTiming.landing) / (1 - pounceTiming.landing));
+    return { prep, flight, crouch: progress < pounceTiming.takeoff ? smooth(clamp(prep * 2.5))
+      : progress < pounceTiming.landing ? 0 : Math.sin(settling * Math.PI),
+      retreat: progress < pounceTiming.takeoff ? smooth(prep) : 1 - flight,
+      wiggle: progress < pounceTiming.takeoff ? Math.sin(prep * Math.PI * 5) * Math.sin(prep * Math.PI) : 0 };
+  }
+
   function drawPounce(progress) {
-    const flight = Math.max(0, Math.min(1, (progress - .18) / .54));
+    const { prep, flight, crouch, wiggle } = pouncePose(progress);
+    const aiming = progress < pounceTiming.takeoff;
     const reach = Math.sin(flight * Math.PI);
-    tail(0, 0);
-    groundLeg([14, 22], [14 - 2 * reach, 26 - 2 * reach], true, 4);
-    groundLeg([25, 22], [26 + 4 * reach, 26 - 2 * reach], true, 4);
-    body(progress < .18 ? 1 : 0);
-    groundLeg([16, 22], [16 - 3 * reach, 26 - 2 * reach], false, 4);
-    groundLeg([27, 22], [28 + 5 * reach, 26 - 3 * reach], false, 4);
-    head(0, progress < .18 ? 1 : 0);
+    const hip = aiming ? wiggle * .8 : 0;
+    // Fold the short legs under the plump body; paws remain on the ground while aiming.
+    tail(crouch, Math.round(wiggle));
+    groundLeg([14 + hip, 22 + crouch * 2], [14 - 2 * reach, 26 - 2 * reach], true, 4);
+    groundLeg([25, 22 + crouch * 2], [26 + 4 * reach, 26 - 2 * reach], true, 4);
+    ctx.save();
+    ctx.translate(hip, 26 * .15 * crouch);
+    ctx.scale(1, 1 - .15 * crouch);
+    body();
+    ctx.restore();
+    groundLeg([16 + hip, 22 + crouch * 2], [16 - 3 * reach, 26 - 2 * reach], false, 4);
+    groundLeg([27, 22 + crouch * 2], [28 + 5 * reach, 26 - 3 * reach], false, 4);
+    head(0, 2 * crouch, aiming ? 'aim' : 'normal', prep);
   }
 
   function drawChase(distance) {
@@ -504,7 +525,7 @@
   function tick(now) {
     if (!active) return;
     if (document.hidden || !stage.isConnected || !pet.isConnected) { stop(); return; }
-    if (pendingInput && playStarted !== null && playKind === 'pounce' && now - playStarted >= 650) {
+    if (pendingInput && playStarted !== null && playKind === 'pounce' && now - playStarted >= timing.pounce * pounceTiming.landing) {
       const input = pendingInput;
       pendingInput = null;
       currentX = playTarget;
@@ -570,10 +591,12 @@
         if (now - lastPaint >= 1000 / 30) {
           lastPaint = now;
           const progress = playElapsed / duration;
-          const flight = Math.max(0, Math.min(1, (progress - .18) / .54));
-          const forward = flight * flight * (3 - 2 * flight);
-          currentX = playKind === 'pounce' ? Math.round(playOrigin + (playTarget - playOrigin) * forward) : playOrigin;
-          const jump = playKind === 'pounce' ? Math.round(Math.sin(flight * Math.PI) * 12) : 0;
+          const pose = pouncePose(progress);
+          const forward = 1 - (1 - pose.flight) ** 2;
+          const backstep = Math.min(3 * pixelScale, direction === 1 ? playOrigin : travel - playOrigin);
+          currentX = playKind === 'pounce'
+            ? playOrigin + (playTarget - playOrigin) * forward - direction * backstep * pose.retreat : playOrigin;
+          const jump = playKind === 'pounce' ? Math.sin(pose.flight * Math.PI) * 10 : 0;
           canvas.style.transform = `translate3d(${currentX}px,${-jump}px,0) scaleX(${direction})`;
           treat.hidden = true;
           paint(playKind, Math.floor(playElapsed / 80), progress);
@@ -709,7 +732,8 @@
     stroke = null;
     // Continuing the same gesture never rewinds its animation.
     if (current === kind) return;
-    if (playStarted !== null && playKind === 'pounce' && now - playStarted < 650) {
+    if (playStarted !== null && playKind === 'pounce' && now - playStarted >= timing.pounce * pounceTiming.takeoff &&
+        now - playStarted < timing.pounce * pounceTiming.landing) {
       // Finish the short airborne part before changing pose; keep only the latest intent.
       pendingInput = { kind, event: { clientX: event.clientX, clientY: event.clientY } };
       clearCursor();
