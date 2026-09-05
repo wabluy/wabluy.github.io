@@ -141,7 +141,7 @@ let activeCatControl = null;
 const isCatControl = control => control === petButton;
 const catControl = () => activeCatControl || petButton;
 function updateCatInteraction() {
-  const preview = catHovered || catFocused || catPointer !== null;
+  const preview = compactProfile.matches ? catHovered || catFocused || catPointer !== null : catHovered;
   const active = preview || catPinned;
   petCard.dataset.open = String(preview);
   petCard.dataset.pinned = String(catPinned);

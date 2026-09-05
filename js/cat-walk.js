@@ -509,7 +509,16 @@
   function measure() {
     const width = canvas.getBoundingClientRect().width;
     pixelScale = width / 40 || 1.6;
+    const previousTravel = travel;
     travel = Math.max(0, stage.getBoundingClientRect().width - width);
+    if (previousTravel > 0 && travel !== previousTravel) {
+      const fit = x => Math.max(0, Math.min(travel, x / previousTravel * travel));
+      currentX = fit(currentX);
+      lastGaitX = currentX;
+      playOrigin = fit(playOrigin);
+      playTarget = fit(playTarget);
+      if (walkAway) { walkAway.from = fit(walkAway.from); walkAway.to = fit(walkAway.to); }
+    }
   }
 
   function stop() {

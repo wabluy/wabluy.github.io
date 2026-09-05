@@ -146,6 +146,9 @@ details[open] > summary > span[aria-hidden='true'] { transform: rotate(45deg); }
 .news-list li > div { min-width: 0; font-size: var(--type-body); line-height: 1.7; }
 footer { display: flex; align-items: center; justify-content: flex-end; gap: 16px; border-top: 1px solid var(--line); padding: 24px 0 32px; color: var(--muted); font-size: var(--type-meta); }
 @media (min-width: 1100px) {
+  :root { --cat-lane-left: max(28px, calc((100% - 1136px) / 2 + 28px)); --cat-lane-width: 216px; }
+  .pet-portrait { left: calc(var(--cat-lane-left) + (var(--cat-lane-width) - 160px) / 2); right: auto; bottom: 64px; border: 0; background: transparent; box-shadow: none; }
+  .pet-portrait .pet-photo { border: 0; }
   .identity { text-align: center; }
   .profile-photo { margin-left: auto; margin-right: auto; }
   .profile-contact { display: flex; flex-direction: column; align-items: flex-start; width: fit-content; margin-left: auto; margin-right: auto; text-align: left; }
