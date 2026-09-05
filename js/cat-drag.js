@@ -23,7 +23,7 @@
   const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
   const smooth=p=>p*p*(3-2*p);
   const width=()=>canvas.getBoundingClientRect().width;
-  const holdDuration=450;
+  const holdDuration=180;
   let state=null,holdTimer=0,lastTick=0,releasingCapture=false,lastHover=null;
   function lineRect(element,edge='top') {
     if(!element?.isConnected)return null;
@@ -181,7 +181,7 @@
       const point=state.point,w=width(),f=state.facing;
       const edge=54,scroll=point.y<edge?-(edge-point.y)/edge:point.y>innerHeight-edge?(point.y-innerHeight+edge)/edge:0;
       if(scroll)window.scrollBy(0,clamp(scroll,-1,1)*240*dt);
-      const progress=api.reduced()?1:clamp((now-state.start)/520,0,1);
+      const progress=api.reduced()?1:clamp((now-state.start)/260,0,1);
       state.liftProgress=progress;
       const lift=smooth(clamp((progress-.35)/.65,0,1));
       const targetX=point.x+sx()-w*(f===1?18:22)/40,targetTop=point.y+sy()-w*6/40;

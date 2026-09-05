@@ -98,8 +98,8 @@
     const target=sample(b,28);return sample(a,28).map((point,i)=>mixPoint(point,target[i],t));
   }
   function poseBody(outer,inner,cream,amount) {
-    const baseOuter=[[7,17],[9,14],[12,12],[16,12],[19,13],[23,11],[26,14],[28,17],[28,20],[25,23],[21,22],[19,23],[17,24],[15,24],[13,23],[11,22],[8,22],[6,20]];
-    const baseInner=[[8,17],[10,15],[12,13],[16,13],[19,14],[23,12],[25,15],[27,18],[27,20],[24,22],[20,21],[18,22],[17,23],[15,23],[13,22],[11,21],[9,21],[7,19]];
+    const baseOuter=[[6.5,17],[8.5,14],[11.8,11.7],[16,11.7],[19,13],[23,11],[26,14],[28,17],[28,20],[25,23],[21,22],[19,23.3],[17,24],[15,24],[13,23.3],[11,22.4],[7.5,22.4],[5.5,20]];
+    const baseInner=[[7.5,17],[9.5,15],[11.8,12.7],[16,12.7],[19,14],[23,12],[25,15],[27,18],[27,20],[24,22],[20,21],[18,22.3],[17,23],[15,23],[13,22.3],[11,21.4],[8.5,21.4],[6.5,19]];
     polygon(mixContour(baseOuter,outer,amount),color.outline);
     polygon(mixContour(baseInner,inner,amount),color.orange);
     polygon(mixContour([[14,20],[21,20],[25,18],[27,19],[25,21],[20,22],[18,22],[18,23],[15,23],[14,22],[12,21]],cream,amount),color.cream);
@@ -202,8 +202,8 @@
   function body(bob = 0, rump = 0) {
     const rise = x => rump * Math.max(0, Math.min(1, (26 - x) / 15));
     const shift = points => points.map(([x, y]) => [x, y + bob - rise(x)]);
-    polygon(shift([[7,17],[9,14],[12,12],[16,12],[19,13],[23,11],[26,14],[28,17],[28,20],[25,23],[21,22],[19,23],[17,24],[15,24],[13,23],[11,22],[8,22],[6,20]]), color.outline);
-    polygon(shift([[8,17],[10,15],[12,13],[16,13],[19,14],[23,12],[25,15],[27,18],[27,20],[24,22],[20,21],[18,22],[17,23],[15,23],[13,22],[11,21],[9,21],[7,19]]), color.orange);
+    polygon(shift([[6.5,17],[8.5,14],[11.8,11.7],[16,11.7],[19,13],[23,11],[26,14],[28,17],[28,20],[25,23],[21,22],[19,23.3],[17,24],[15,24],[13,23.3],[11,22.4],[7.5,22.4],[5.5,20]]), color.outline);
+    polygon(shift([[7.5,17],[9.5,15],[11.8,12.7],[16,12.7],[19,14],[23,12],[25,15],[27,18],[27,20],[24,22],[20,21],[18,22.3],[17,23],[15,23],[13,22.3],[11,21.4],[8.5,21.4],[6.5,19]]), color.orange);
     polygon(shift([[10,17],[12,15],[16,15],[19,16],[21,16],[22,18],[16,18],[12,19],[10,18]]),color.light);
     polygon(shift([[14,20],[21,20],[25,18],[27,19],[25,21],[20,22],[18,22],[18,23],[15,23],[14,22],[12,21]]), color.cream);
     rect(13, 14 + bob - rise(14), 2, 3, color.stripe);
@@ -587,8 +587,8 @@
     groundLeg([14 + hip, 22 + crouch * 2], [14 - 2 * reach, 26 - 2 * reach], true, 4);
     groundLeg([25, 22 + crouch * 2], [26 + 4 * reach, 26 - 2 * reach], true, 4);
     ctx.save();
-    ctx.translate(hip, 26 * .15 * crouch);
-    ctx.scale(1, 1 - .15 * crouch);
+    ctx.translate(hip, 26 * .1 * crouch);
+    ctx.scale(1, 1 - .1 * crouch);
     body();
     ctx.restore();
     groundLeg([16 + hip, 22 + crouch * 2], [16 - 3 * reach, 26 - 2 * reach], false, 4);
@@ -638,10 +638,10 @@
     tail(0, Math.round(Math.sin(progress * Math.PI * 4) * upright));
     limb([[14, 23], [14, 25], [14, 26]], true);
     polygon(morph(
-      [[7,17],[9,14],[12,12],[16,12],[19,13],[23,11],[26,14],[28,17],[28,20],[25,23],[21,22],[19,23],[17,24],[15,24],[13,23],[11,22],[8,22],[6,20]],
+      [[6.5,17],[8.5,14],[11.8,11.7],[16,11.7],[19,13],[23,11],[26,14],[28,17],[28,20],[25,23],[21,22],[19,23.3],[17,24],[15,24],[13,23.3],[11,22.4],[7.5,22.4],[5.5,20]],
       [[10,20],[13,16],[18,12],[23,10],[26,13],[26,19],[25,23],[23,25],[12,25],[9,23],[8,21]]), color.outline);
     polygon(morph(
-      [[8,17],[10,15],[12,13],[16,13],[19,14],[23,12],[25,15],[27,18],[27,20],[24,22],[20,21],[18,22],[17,23],[15,23],[13,22],[11,21],[9,21],[7,19]],
+      [[7.5,17],[9.5,15],[11.8,12.7],[16,12.7],[19,14],[23,12],[25,15],[27,18],[27,20],[24,22],[20,21],[18,22.3],[17,23],[15,23],[13,22.3],[11,21.4],[8.5,21.4],[6.5,19]],
       [[11,20],[14,17],[18,13],[22,11],[25,14],[25,19],[24,22],[22,24],[12,24],[10,22],[9,21]]), color.orange);
     polygon([[mix(13,17),21],[mix(23,24),mix(20,14)],[mix(27,25),21],[mix(25,23),24],[13,24],[11,23]], color.cream);
     rect(13, mix(14,19), 2, 3, color.stripe);
@@ -716,7 +716,7 @@
       gaitBlend+=Math.max(-step,Math.min(step,target-gaitBlend));
     }
     lastGaitX = currentX;
-    if(!poseHandoff && lastPose && lastPose.kind!==kind && restingActions.has(lastPose.kind) &&
+    if(!laneMotion && !poseHandoff && lastPose && lastPose.kind!==kind && restingActions.has(lastPose.kind) &&
       ((lastPose.progress>.12&&lastPose.progress<.88)||(lastPose.kind==='scared'&&lastPose.progress>.1)) && !transportDriver?.blocksInput() && !reducedMotion.matches) {
       const now=performance.now();poseHandoff={source:lastPose,start:now,last:now};
       return;
@@ -788,6 +788,9 @@
     if (transportDriver?.isAway() || desktopLane.matches || reducedMotion.matches) return;
     const {from,to,duration,expanded} = event.detail;
     if (!active && pet.dataset.interacting !== 'true') return;
+    // Platform motion owns its clock; a prior pose must not delay the DOM animation.
+    poseHandoff = null;
+    delete stage.dataset.transition;
     pendingLandingGroom = expanded;
     pendingCompactTension = !expanded;
     if (!active) return;
@@ -862,7 +865,7 @@
         pose = 'scared';
       }
     } else if (motion.kind === 'landing') {
-      progress = 1 - .25 * clamp(elapsed / 160);
+      progress = 1 - smooth(clamp(elapsed / 160));
       if (elapsed >= 160) { laneMotion = { kind: 'grooming', start: now, variant: Math.random() < .65 ? 'groom' : 'belly-groom' }; stage.dataset.lane = 'grooming'; }
     } else if (motion.kind === 'grooming') {
       pose = motion.variant || 'groom';
