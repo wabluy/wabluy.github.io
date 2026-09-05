@@ -44,5 +44,18 @@
 
 html.cat-cursor-hand, html.cat-cursor-hand * { cursor: grab !important; }
 html.cat-cursor-feather, html.cat-cursor-feather * {
-  cursor: url('../assets/cat-feather-cursor.svg') 22 9, pointer !important;
+  cursor: url('../assets/cat-feather-cursor.svg?v=20260906-single-feather') 22 9, pointer !important;
 }
+
+.cat-feather-toy {
+  position: fixed; width: 32px; height: 32px; z-index: 100;
+  pointer-events: none; transform-origin: 22px 9px;
+  animation: cat-feather-shake .55s ease-in-out infinite;
+}
+.cat-feather-toy[hidden] { display: none; }
+html.cat-cursor-playing, html.cat-cursor-playing * { cursor: none !important; }
+@keyframes cat-feather-shake {
+  0%, 100% { transform: rotate(-16deg); }
+  50% { transform: rotate(16deg); }
+}
+@media (prefers-reduced-motion: reduce) { .cat-feather-toy { animation: none; } }

@@ -138,7 +138,7 @@ floatingPortrait.removeAttribute('id');
 floatingPortrait.classList.add('pet-floating-portrait');
 floatingPortrait.setAttribute('aria-hidden', 'true');
 document.body.append(floatingPortrait);
-let catPinned = false;
+let catPinned = true;
 let catHovered = false;
 let catFocused = false;
 let catPointer = null;
