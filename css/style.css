@@ -139,13 +139,16 @@ ul {
 .layout {
   display: flex;
   gap: 3rem;
-  align-items: stretch;
+  align-items: flex-start;
 }
 
 /* === Sidebar === */
 .sidebar {
-  /* Stretch with the content column so the pet can sit at its bottom. */
-  position: static;
+  /* Fill the first viewport below the navigation, leaving a bottom gutter. */
+  position: sticky;
+  top: 74px;
+  height: calc(100vh - 98px);
+  height: calc(100dvh - 98px);
   width: 220px;
   flex-shrink: 0;
   display: flex;
@@ -459,6 +462,36 @@ a.tag:hover {
   margin-top: 1rem;
 }
 
+/* Keep both portraits visible on shorter desktop windows. */
+@media (min-width: 769px) and (max-height: 700px) {
+  .sidebar {
+    padding-top: 0;
+  }
+
+  .profile-photo img,
+  .photo-fallback {
+    width: 120px;
+    height: 120px;
+  }
+
+  .sidebar-name {
+    margin-top: 0.5rem;
+  }
+
+  .sidebar-title {
+    margin-bottom: 0.5rem;
+  }
+
+  .sidebar-links {
+    margin-top: 0.5rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .pet-card {
+    padding-top: 0.75rem;
+  }
+}
+
 /* === Responsive === */
 @media (max-width: 768px) {
   .layout {
@@ -468,6 +501,7 @@ a.tag:hover {
   .sidebar {
     position: static;
     width: 100%;
+    height: auto;
     min-height: 0;
     display: flex;
     flex-direction: row;
@@ -523,6 +557,7 @@ a.tag:hover {
   }
   .sidebar {
     position: static;
+    height: auto;
     min-height: 0;
   }
 }
