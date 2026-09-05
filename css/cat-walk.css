@@ -41,3 +41,8 @@
   pointer-events: none;
 }
 .cat-walk-treat[hidden] { display: none; }
+
+html.cat-cursor-hand, html.cat-cursor-hand * { cursor: grab !important; }
+html.cat-cursor-feather, html.cat-cursor-feather * {
+  cursor: url('../assets/cat-feather-cursor.svg') 22 9, pointer !important;
+}
