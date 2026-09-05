@@ -212,9 +212,9 @@
     rect(tipX - 1, tipY, 2, 2, color.stripe);
   }
 
-  function body(bob = 0, rump = 0) {
+  function body(bob = 0, rump = 0, stretch = 0) {
     const rise = x => rump * Math.max(0, Math.min(1, (26 - x) / 15));
-    const shift = points => points.map(([x, y]) => [x, y + bob - rise(x)]);
+    const shift = points => points.map(([x, y]) => [x + Math.min(0,x-23)*stretch, y + bob - rise(x)]);
     polygon(shift([[6.5,17],[8.5,14],[11.8,11.7],[16,11.7],[19,13],[23,11],[26,14],[28,17],[28,20],[25,23],[21,22],[19,23.3],[17,24],[15,24],[13,23.3],[11,22.4],[7.5,22.4],[5.5,20]]), color.outline);
     polygon(shift([[7.5,17],[9.5,15],[11.8,12.7],[16,12.7],[19,14],[23,12],[25,15],[27,18],[27,20],[24,22],[20,21],[18,22.3],[17,23],[15,23],[13,22.3],[11,21.4],[8.5,21.4],[6.5,19]]), color.orange);
     polygon(shift([[10,17],[12,15],[16,15],[19,16],[21,16],[22,18],[16,18],[12,19],[10,18]]),color.light);
@@ -305,8 +305,10 @@
     const phase = ((distance / cycle + offset) % 1 + 1) % 1;
     if (phase < stance) return [x + stride / 2 - cycle * phase, 26];
     const swing = (phase - stance) / (1 - stance);
-    const ease = swing * swing * (3 - 2 * swing);
-    return [x - stride / 2 + stride * ease, 26 - lift * Math.sin(Math.PI * swing)];
+    // Match the stance velocity at toe-off and touchdown, then tuck and reach in between.
+    const ease = swing * swing * (3 - 2 * swing)
+      - (1-stance)/stance * swing*(1-swing)*(1-2*swing);
+    return [x - stride / 2 + stride * ease, 26 - lift * Math.sin(Math.PI * swing)**2];
   }
 
   function drawWalk(distance) {
@@ -457,24 +459,29 @@
     const phase = ((distance / cycle) % 1 + 1) % 1;
     const air = phase > .37 && phase < .5 ? Math.sin((phase - .37) / .13 * Math.PI)
       : phase > .87 ? Math.sin((phase - .87) / .13 * Math.PI) : 0;
-    const compression = phase < .3 ? Math.sin(phase / .3 * Math.PI) * .45 : 0;
-    const lift = compression - air * 1.4;
-    const arch = .4 * Math.sin(phase * Math.PI * 2) ** 2;
+    const load = (start,end) => phase>start && phase<end ? Math.sin((phase-start)/(end-start)*Math.PI) : 0;
+    const compression = .5*load(.07,.3)+.25*load(.57,.8);
+    const lift = compression - air * 1.2;
+    const arch = .35 * load(.57,.87);
+    const stretch = .04*air-.025*compression;
     const foot = (x, offset) => gaitFoot(x, distance, offset, 4.5, .3, 3.1);
-    return { phase, lift, arch, feet: [foot(11,.5),foot(23,0),foot(13,.43),foot(28,-.07)] };
+    return { phase, lift, arch, stretch, feet: [foot(11,.5),foot(23,0),foot(13,.43),foot(28,-.07)] };
   }
 
   function drawSprint(distance,blend=1) {
-    const pose=sprintPose(distance),phase=pose.phase,lift=pose.lift*blend,arch=pose.arch*blend;
+    const pose=sprintPose(distance),phase=pose.phase;
+    const walkLoad=.2*(1-Math.cos(distance/(4/.65)*Math.PI*4))/2;
+    const lift=pose.lift*blend+walkLoad*(1-blend),arch=pose.arch*blend,stretch=pose.stretch*blend;
+    const hipShift=-12*stretch;
     const walking=[gaitFoot(11,distance,.5),gaitFoot(23,distance,.75),gaitFoot(13,distance,0),gaitFoot(28,distance,.25)];
     const feet=pose.feet.map((foot,i)=>mixPoint(walking[i],foot,blend));
-    tail(lift-arch*.4,Math.sin(phase*Math.PI*2)*.5);
-    groundLeg([11,20+lift-arch],feet[0],true,4);
+    ctx.save();ctx.translate(hipShift,0);tail(lift-arch*.4,Math.sin(phase*Math.PI*2)*.5);ctx.restore();
+    groundLeg([11+hipShift,20+lift-arch],feet[0],true,4);
     frontLeg([23,20+lift],feet[1],true);
-    body(lift,arch);
-    groundLeg([13,20+lift-arch*.65],feet[2],false,4);
+    body(lift,arch,stretch);
+    groundLeg([13+hipShift,20+lift-arch*.65],feet[2],false,4);
     frontLeg([28,20+lift],feet[3]);
-    head(-arch*.35,-1+lift*.7);
+    head(-arch*.25,-1+lift*.4);
     polygon([[24,20],[28,20],[29,21],[28,22],[26,23],[24,22]].map(([x,y])=>[x,y+lift]),color.orange);
     polygon([[25,20],[28,20],[28,21],[26,22],[25,21]].map(([x,y])=>[x,y+lift]),color.cream);
   }
@@ -1037,7 +1044,8 @@
       startedAt = now;
       elapsed = 0;
     }
-    if (now - lastPaint >= 1000 / 30) {
+    const poseRate = ['walk','sprint','chase','turn'].includes(lastPose?.kind) ? 60 : 30;
+    if (now - lastPaint >= 1000 / poseRate) {
       lastPaint = now;
       let phaseTime = elapsed;
       let phase = sequence[0];
