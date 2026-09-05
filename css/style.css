@@ -221,35 +221,28 @@ ul {
 }
 
 .pet-card {
-  margin-top: 2rem;
-  padding-top: 1.3rem;
+  margin-top: 3.75rem;
+  padding-top: 1.5rem;
   border-top: 1px solid var(--border);
   text-align: center;
 }
 
 .pet-photo {
   display: block;
-  width: 120px;
-  height: 120px;
-  margin: 0 auto 0.7rem;
-  border: 1px solid var(--border);
-  border-radius: 16px;
+  width: 92px;
+  height: 92px;
+  margin: 0 auto 0.8rem;
+  border: 3px solid var(--border);
+  border-radius: 50%;
   object-fit: cover;
   object-position: center;
 }
 
 .pet-name {
-  font-size: 0.95rem;
-  font-weight: 600;
-  color: var(--text);
-  line-height: 1.3;
-}
-
-.pet-desc {
-  margin-top: 0.25rem;
-  font-size: 0.82rem;
-  line-height: 1.45;
+  font-size: 0.9rem;
+  font-weight: 500;
   color: var(--text-secondary);
+  line-height: 1.3;
 }
 
 .visitor-count {
@@ -442,7 +435,6 @@ a.tag:hover {
   margin-left: 0.3rem;
 }
 
-
 .award-badge {
   display: inline-block;
   padding: 1px 8px;
@@ -496,8 +488,8 @@ a.tag:hover {
 
   .pet-card {
     flex-basis: 100%;
-    margin-top: 0.5rem;
-    padding-top: 1rem;
+    margin-top: 1.5rem;
+    padding-top: 1.25rem;
     text-align: center;
   }
 
