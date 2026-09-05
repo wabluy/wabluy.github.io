@@ -30,3 +30,14 @@
 @media print {
   .cat-walk { display: none; }
 }
+
+.cat-walk-treat {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 20px;
+  height: 17px;
+  image-rendering: pixelated;
+  pointer-events: none;
+}
+.cat-walk-treat[hidden] { display: none; }
