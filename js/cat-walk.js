@@ -47,18 +47,20 @@
   let startedAt = 0;
   let lastPaint = -Infinity;
   let travel = 0;
+  let pixelScale = 1.6;
+  let gaitDistance = 0;
+  let lastGaitX = 0;
   let sequence = [];
   let totalDuration = 0;
   let playStarted = null;
+  let pendingInput = null;
+  const timing = { pet: 1500, tail: 1800, grab: 1200, pounce: 900 };
   let playKind = 'pounce';
-  let attentionAvailableAt = 0;
   let playOrigin = 0;
   let playTarget = 0;
   let petStarted = null;
   let tailStarted = null;
-  let attention = null;
   let walkAway = null;
-  let quietUntil = 0;
   let cursorPoint = null;
   let tailRoot = { x: 11, y: 21 };
   let petTimer = 0;
@@ -234,19 +236,27 @@
     }
   }
 
-  function drawWalk(frame) {
-    const phase = frame % 12 / 12 * Math.PI * 2;
-    const bob = Math.round(-.55 * Math.sin(phase * 2) ** 2);
-    const foot = (x, offset) => {
-      const angle = phase + offset;
-      return [x + 2 * Math.cos(angle), 26 - Math.max(0, -Math.sin(angle))];
-    };
+  // During stance, the paw retreats by exactly the distance the body advances.
+  // During swing it lifts and returns forward; elapsed time alone never moves a leg.
+  function gaitFoot(x, distance, offset = 0, stride = 4, stance = .65, lift = 2) {
+    const cycle = stride / stance;
+    const phase = ((distance / cycle + offset) % 1 + 1) % 1;
+    if (phase < stance) return [x + stride / 2 - cycle * phase, 26];
+    const swing = (phase - stance) / (1 - stance);
+    const ease = swing * swing * (3 - 2 * swing);
+    return [x - stride / 2 + stride * ease, 26 - lift * Math.sin(Math.PI * swing)];
+  }
+
+  function drawWalk(distance) {
+    const phase = distance / (4 / .65) * Math.PI * 2;
+    const bob = 0; // Keep the weight steady while four short legs take separate steps.
+    const foot = (x, offset) => gaitFoot(x, distance, offset);
     tail(bob, Math.round(Math.sin(phase) * .5));
-    groundLeg([14, 21 + bob], foot(14, Math.PI), true);
-    groundLeg([25, 21 + bob], foot(25, 0), true);
+    groundLeg([14, 21 + bob], foot(14, .5), true);
+    groundLeg([25, 21 + bob], foot(25, .75), true);
     body(bob);
     groundLeg([16, 22 + bob], foot(16, 0));
-    groundLeg([27, 22 + bob], foot(27, Math.PI));
+    groundLeg([27, 22 + bob], foot(27, .25));
     head(0, bob);
   }
 
@@ -328,19 +338,16 @@
     paw([23, 24], [21, 22], [21, 20 + curl], false);
   }
 
-  function drawSprint(frame) {
-    const phase = frame % 12 / 12 * Math.PI * 2;
-    const lift = Math.round(-(Math.sin(phase) ** 2));
-    const foot = (x, offset) => {
-      const angle = phase + offset;
-      return [x + 4 * Math.cos(angle), 26 - Math.max(0, -Math.sin(angle)) * 2];
-    };
+  function drawSprint(distance) {
+    const phase = distance / (6 / .55) * Math.PI * 2;
+    const lift = -.6 * Math.sin(phase * 2) ** 2;
+    const foot = (x, offset) => gaitFoot(x, distance, offset, 6, .55, 2.5);
     tail(lift, 1);
-    groundLeg([14, 21 + lift], foot(14, Math.PI + .5), true, 4);
-    groundLeg([25, 21 + lift], foot(25, .5), true, 4);
+    groundLeg([14, 21 + lift], foot(14, .5), true, 4);
+    groundLeg([25, 21 + lift], foot(25, 0), true, 4);
     body(lift);
-    groundLeg([16, 22 + lift], foot(16, Math.PI), false, 4);
-    groundLeg([27, 22 + lift], foot(27, 0), false, 4);
+    groundLeg([16, 22 + lift], foot(16, 0), false, 4);
+    groundLeg([27, 22 + lift], foot(27, .5), false, 4);
     head(0, lift);
   }
 
@@ -387,18 +394,8 @@
     head(0, progress < .18 ? 1 : 0);
   }
 
-  function drawChase(frame, progress) {
-    if (progress > .87) {
-      drawWalk(0);
-      // A little chewing motion when the treat reaches the muzzle.
-      rect(30, 19, 4, frame % 2 ? 2 : 1, color.outline);
-      rect(31, 19, 2, 1, color.light);
-      return;
-    }
-    ctx.save();
-    ctx.translate(0, frame % 6 < 3 ? -1 : 0);
-    drawWalk(frame);
-    ctx.restore();
+  function drawChase(distance) {
+    drawWalk(distance);
   }
 
   function drawPlay(frame, progress) {
@@ -456,6 +453,8 @@
   function paint(kind, frame, progress = 0) {
     frame = Number.isFinite(frame) ? Math.max(0, Math.floor(frame)) : 0;
     progress = Number.isFinite(progress) ? Math.max(0, Math.min(1, progress)) : 0;
+    if (['walk', 'sprint', 'chase'].includes(kind)) gaitDistance += Math.abs(currentX - lastGaitX) / pixelScale;
+    lastGaitX = currentX;
     ctx.clearRect(0, 0, 40, 28);
     tailRoot = { x: 11, y: 21 };
     stage.dataset.action = kind;
@@ -466,12 +465,12 @@
     else if (kind === 'play') drawPlay(frame, progress);
     else if (kind === 'belly') drawBelly(frame, progress);
     else if (kind === 'sploot') drawSploot(frame);
-    else if (kind === 'sprint') drawSprint(frame, progress);
-    else if (kind === 'chase') drawChase(frame, progress);
+    else if (kind === 'sprint') drawSprint(gaitDistance);
+    else if (kind === 'chase') drawChase(gaitDistance);
     else if (kind === 'yawn') drawYawn(progress);
     else if (kind === 'scratch') drawScratch(frame, progress);
     else if (kind === 'idle') drawWalk(0);
-    else drawWalk(frame);
+    else drawWalk(gaitDistance);
     if (cursorPoint && active) {
       const point = pointerOnSprite(cursorPoint);
       showCursor(point ? cursorZone(point) : null);
@@ -479,17 +478,17 @@
   }
 
   function measure() {
-    travel = Math.max(0, stage.getBoundingClientRect().width - canvas.getBoundingClientRect().width);
+    const width = canvas.getBoundingClientRect().width;
+    pixelScale = width / 40 || 1.6;
+    travel = Math.max(0, stage.getBoundingClientRect().width - width);
   }
 
   function stop() {
     active = false;
     treat.hidden = true;
     playStarted = petStarted = tailStarted = null;
-    attention = null;
-    attentionAvailableAt = 0;
+    pendingInput = null;
     walkAway = null;
-    quietUntil = 0;
     cursorPoint = null;
     clearCursor();
     stroke = null;
@@ -505,12 +504,20 @@
   function tick(now) {
     if (!active) return;
     if (document.hidden || !stage.isConnected || !pet.isConnected) { stop(); return; }
+    if (pendingInput && playStarted !== null && playKind === 'pounce' && now - playStarted >= 650) {
+      const input = pendingInput;
+      pendingInput = null;
+      currentX = playTarget;
+      playStarted = null;
+      canvas.style.transform = `translate3d(${currentX}px,0,0) scaleX(${direction})`;
+      startInput(input.kind, input.event, now);
+    }
     if (walkAway !== null) {
       const elapsed = Math.max(0, now - walkAway.start);
       const progress = Math.min(1, elapsed / 3000);
-      if (now - lastPaint >= 1000 / 24) {
+      if (now - lastPaint >= 1000 / 30) {
         lastPaint = now;
-        currentX = Math.round(walkAway.from + (walkAway.to - walkAway.from) * progress);
+        currentX = walkAway.from + (walkAway.to - walkAway.from) * progress;
         canvas.style.transform = `translate3d(${currentX}px,0,0) scaleX(${direction})`;
         treat.hidden = true;
         paint('walk', Math.floor(elapsed / 110));
@@ -524,21 +531,13 @@
       startedAt = now;
       lastPaint = -Infinity;
     }
-    if (attention !== null) {
-      if (now < attention.until) {
-        frameRequest = requestAnimationFrame(tick);
-        return;
-      }
-      releaseAttention(now);
-      stroke = null;
-    }
     if (tailStarted !== null) {
       const elapsed = Math.max(0, now - tailStarted);
-      if (elapsed < 3000) {
-        if (now - lastPaint >= 1000 / 24) {
+      if (elapsed < timing.tail) {
+        if (now - lastPaint >= 1000 / 30) {
           lastPaint = now;
           treat.hidden = true;
-          paint('tail-enjoy', 0, elapsed / 3000);
+          paint('tail-enjoy', 0, elapsed / timing.tail);
         }
         frameRequest = requestAnimationFrame(tick);
         return;
@@ -550,11 +549,11 @@
     }
     if (petStarted !== null) {
       const elapsed = Math.max(0, now - petStarted);
-      if (elapsed < 2400) {
-        if (now - lastPaint >= 1000 / 24) {
+      if (elapsed < timing.pet) {
+        if (now - lastPaint >= 1000 / 30) {
           lastPaint = now;
           treat.hidden = true;
-          paint('pet', 0, elapsed / 2400);
+          paint('pet', 0, elapsed / timing.pet);
         }
         frameRequest = requestAnimationFrame(tick);
         return;
@@ -566,10 +565,11 @@
     }
     if (playStarted !== null) {
       const playElapsed = Math.max(0, now - playStarted);
-      if (playElapsed < 2100) {
-        if (now - lastPaint >= 1000 / 24) {
+      const duration = timing[playKind];
+      if (playElapsed < duration) {
+        if (now - lastPaint >= 1000 / 30) {
           lastPaint = now;
-          const progress = playElapsed / 2100;
+          const progress = playElapsed / duration;
           const flight = Math.max(0, Math.min(1, (progress - .18) / .54));
           const forward = flight * flight * (3 - 2 * flight);
           currentX = playKind === 'pounce' ? Math.round(playOrigin + (playTarget - playOrigin) * forward) : playOrigin;
@@ -595,7 +595,7 @@
       startedAt = now;
       elapsed = 0;
     }
-    if (now - lastPaint >= 1000 / 24) {
+    if (now - lastPaint >= 1000 / 30) {
       lastPaint = now;
       let phaseTime = elapsed;
       let phase = sequence[0];
@@ -607,7 +607,7 @@
       const progress = Math.min(1, phaseTime / phase.duration);
       const along = phase.from + (phase.to - phase.from) * progress;
       const position = direction === 1 ? along : 1 - along;
-      currentX = Math.round(travel * position);
+      currentX = travel * position;
       canvas.style.transform = `translate3d(${currentX}px,0,0) scaleX(${direction})`;
       paint(phase.kind, Math.floor(phaseTime / (phase.frameMs || 110)), progress);
     }
@@ -622,7 +622,7 @@
     measure();
     stage.classList.add('is-active');
     direction = 1;
-    currentX = 0;
+    currentX = lastGaitX = gaitDistance = 0;
     paint('walk', 0);
     if (reducedMotion.matches) {
       canvas.style.transform = `translate3d(${Math.round(travel * .15)}px,0,0)`;
@@ -646,11 +646,10 @@
     function walkTo(destination) {
       const roll = Math.random();
       const kind = roll < .3 ? 'chase' : roll < .55 ? 'sprint' : 'walk';
-      const speed = kind === 'sprint' ? between(.22, .3) : kind === 'chase' ? between(.10, .14) : between(.075, .105);
+      const speed = pixelScale * (kind === 'sprint' ? between(17, 20) : kind === 'chase' ? between(9, 11) : between(7, 9));
       sequence.push({
         kind, from: position, to: destination,
-        duration: Math.max(kind === 'sprint' ? 1050 : 1400, (destination - position) / speed * 1000),
-        frameMs: kind === 'sprint' ? 75 : kind === 'chase' ? 75 : 110 * .09 / speed
+        duration: Math.max(250, (destination - position) * travel / speed * 1000)
       });
       position = destination;
     }
@@ -669,12 +668,11 @@
   }
 
   function beginWalkAway(now) {
-    releaseAttention(now);
     stroke = null;
     clearCursor();
     let room = direction === 1 ? travel - currentX : currentX;
     if (room < Math.min(36, travel * .2)) { direction *= -1; room = direction === 1 ? travel - currentX : currentX; }
-    const distance = Math.min(room, Math.max(36, travel * .23));
+    const distance = Math.min(room, 8 * pixelScale * 3);
     walkAway = { start: now, from: currentX, to: Math.max(0, Math.min(travel, currentX + direction * distance)) };
     lastPaint = -Infinity;
   }
@@ -688,20 +686,14 @@
     if (point.x >= headRegion.left - 3 && point.x <= headRegion.right + 3 &&
         point.y >= headRegion.top - 5 && point.y <= headRegion.top + 16) return 'head';
     if (Math.abs(point.x - tailRoot.x) <= 6 && Math.abs(point.y - tailRoot.y) <= 7) return 'tail';
-    if (point.x > headRegion.right && point.x < headRegion.right + 36 &&
-        point.y >= headRegion.top - 6 && point.y <= headRegion.bottom + 6) return 'front';
+    if (point.x > headRegion.right && point.x < headRegion.right + 66 &&
+        point.y >= headRegion.top - 12 && point.y <= headRegion.bottom + 12) return 'front';
     return null;
   }
 
   function showCursor(zone) {
     document.documentElement.classList.toggle('cat-cursor-hand', zone === 'head' || zone === 'tail');
     document.documentElement.classList.toggle('cat-cursor-feather', zone === 'front');
-  }
-
-  function releaseAttention(now) {
-    if (attention === null) return;
-    startedAt += Math.max(0, now - attention.start);
-    attention = null;
   }
 
   function pointerOnSprite(event) {
@@ -712,25 +704,46 @@
       y: (event.clientY - bounds.top) / bounds.height * 28 };
   }
 
+  function startInput(kind, event, now) {
+    const current = petStarted !== null ? 'pet' : tailStarted !== null ? 'tail-enjoy' : playStarted !== null ? playKind : null;
+    stroke = null;
+    // Continuing the same gesture never rewinds its animation.
+    if (current === kind) return;
+    if (playStarted !== null && playKind === 'pounce' && now - playStarted < 650) {
+      // Finish the short airborne part before changing pose; keep only the latest intent.
+      pendingInput = { kind, event: { clientX: event.clientX, clientY: event.clientY } };
+      clearCursor();
+      return;
+    }
+    pendingInput = null;
+    playStarted = petStarted = tailStarted = null;
+    walkAway = null;
+    clearTimeout(petTimer);
+    clearCursor();
+    canvas.style.transform = `translate3d(${currentX}px,0,0) scaleX(${direction})`;
+    const point = pointerOnSprite(event);
+    if (kind === 'pet' || kind === 'tail-enjoy') beginReaction(kind, now);
+    else if (point) beginFeatherPlay(kind, event, point, now);
+  }
+
   function beginReaction(kind, now) {
-    releaseAttention(now);
     stroke = null;
     if (playStarted !== null) { startedAt += now - playStarted; playStarted = null; }
     if (reducedMotion.matches) {
       paint(kind, 0, kind === 'tail-enjoy' ? .4 : 0);
       clearTimeout(petTimer);
       petTimer = setTimeout(() => {
-        if (active) { quietUntil = performance.now() + 3000; paint('walk', 0); }
+        if (active) { paint('walk', 0); }
       }, 1800);
       return;
     }
     if (kind === 'pet') petStarted = now;
     else tailStarted = now;
-    lastPaint = -Infinity;
+    paint(kind, 0, 0);
+    lastPaint = now;
   }
 
   function beginFeatherPlay(kind, event, point, now) {
-    releaseAttention(now);
     stroke = null;
     playKind = kind;
     playOrigin = currentX;
@@ -742,10 +755,12 @@
     featherToy.hidden = false;
     document.documentElement.classList.add('cat-cursor-playing');
     playStarted = now;
+    paint(kind, 0, 0);
+    lastPaint = now;
   }
 
-  // Hovering a contact area steadies the cat briefly, then small back-and-forth
-  // strokes pet its forehead or rump. Neither gesture needs a click.
+  // Human input can interrupt automatic movement, including the quiet walk-away.
+  // No hover pause is needed: latch a brief stroke across small hit-area boundaries.
   document.addEventListener('pointermove', event => {
     if (!active || event.pointerType !== 'mouse') { clearCursor(); return; }
     cursorPoint = { clientX: event.clientX, clientY: event.clientY };
@@ -755,51 +770,41 @@
     }
     const point = pointerOnSprite(event);
     if (!point) return;
-    const zone = cursorZone(point);
-    showCursor(zone);
     const now = performance.now();
-    if (event.buttons || petStarted !== null || tailStarted !== null || playStarted !== null || walkAway !== null || now < quietUntil) return;
-    if (zone !== 'head' && zone !== 'tail' && zone !== 'front') {
-      stroke = null;
-      releaseAttention(now);
+    let zone = cursorZone(point);
+    if (stroke && now - stroke.lastTime < 180 && zone !== stroke.zone &&
+        Math.hypot(event.clientX - stroke.x, event.clientY - stroke.y) < 18) zone = stroke.zone;
+    showCursor(zone);
+    if (event.buttons) { stroke = null; return; }
+    if (!zone) { stroke = null; return; }
+    if (!stroke || stroke.zone !== zone || now - stroke.lastTime > 450 || now - stroke.time > 1200) {
+      stroke = { zone, x: event.clientX, y: event.clientY, vector: null, turns: 0, travel: 0, time: now, lastTime: now };
       return;
     }
-    if (attention && attention.reason !== zone) releaseAttention(now);
-    if (!stroke || stroke.zone !== zone || now - stroke.time > 2000) {
-      stroke = { zone, x: event.clientX, y: event.clientY, vector: null, turns: 0, travel: 0, time: now };
-      return;
-    }
+    stroke.lastTime = now;
     const dx = event.clientX - stroke.x, dy = event.clientY - stroke.y;
     const distance = Math.hypot(dx, dy);
-    if (distance < 3) return;
-    // Only a deliberate stroke earns a short pause. Jitter cannot renew it
-    // continuously and leave an otherwise active cat stuck in place.
-    if (!attention && now >= attentionAvailableAt && !reducedMotion.matches) {
-      attention = { start: now, until: now + 650, reason: zone };
-      attentionAvailableAt = now + 2500;
-    }
+    if (distance < 2) return;
     const vector = [dx / distance, dy / distance];
-    if (stroke.vector && vector[0] * stroke.vector[0] + vector[1] * stroke.vector[1] < -.25) stroke.turns++;
+    if (stroke.vector && vector[0] * stroke.vector[0] + vector[1] * stroke.vector[1] < -.1) stroke.turns++;
     stroke.x = event.clientX;
     stroke.y = event.clientY;
     stroke.vector = vector;
     stroke.travel += distance;
-    if (stroke.turns >= 1 && stroke.travel >= 10) {
-      if (zone === 'front') {
-        if (!reducedMotion.matches) beginFeatherPlay('grab', event, point, now);
-      } else beginReaction(zone === 'head' ? 'pet' : 'tail-enjoy', now);
+    if (stroke.turns && stroke.travel >= 6) {
+      const kind = zone === 'head' ? 'pet' : zone === 'tail' ? 'tail-enjoy' : 'grab';
+      if (!reducedMotion.matches || kind !== 'grab') startInput(kind, event, now);
     }
   }, { passive: true });
 
   document.addEventListener('pointerdown', event => {
-    if (!active || petStarted !== null || tailStarted !== null || playStarted !== null || walkAway !== null ||
-        performance.now() < quietUntil || reducedMotion.matches || !event.isPrimary || event.button !== 0) return;
+    if (!active || reducedMotion.matches || !event.isPrimary || event.button !== 0) return;
     const point = pointerOnSprite(event);
     if (!point || cursorZone(point) !== 'front') return;
-    beginFeatherPlay('pounce', event, point, performance.now());
+    startInput('pounce', event, performance.now());
   });
   document.addEventListener('pointerout', event => {
-    if (!event.relatedTarget) { cursorPoint = null; clearCursor(); stroke = null; releaseAttention(performance.now()); }
+    if (!event.relatedTarget) { cursorPoint = null; clearCursor(); stroke = null; }
   });
   window.addEventListener('blur', () => { cursorPoint = null; clearCursor(); });
 

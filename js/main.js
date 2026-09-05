@@ -132,29 +132,21 @@ function createHoverPreview(root, trigger, media) {
 const petCard = document.querySelector('.pet-card');
 const compactProfile = window.matchMedia('(width < 1100px)');
 const petButton = petCard.querySelector('.pet-toggle');
-const petPhoto = petCard.querySelector('.pet-photo');
-const floatingPortrait = petCard.querySelector('.pet-portrait').cloneNode(true);
-floatingPortrait.removeAttribute('id');
-floatingPortrait.classList.add('pet-floating-portrait');
-floatingPortrait.setAttribute('aria-hidden', 'true');
-document.body.append(floatingPortrait);
-let catPinned = true;
+let catPinned = false;
 let catHovered = false;
 let catFocused = false;
 let catPointer = null;
 let catInteracting = false;
 let activeCatControl = null;
-const isCatControl = control => control === petButton || (!compactProfile.matches && control === petPhoto);
+const isCatControl = control => control === petButton;
 const catControl = () => activeCatControl || petButton;
 function updateCatInteraction() {
   const preview = catHovered || catFocused || catPointer !== null;
   const active = preview || catPinned;
-  petCard.dataset.open = String(preview && compactProfile.matches);
-  floatingPortrait.dataset.open = String(preview && !compactProfile.matches);
+  petCard.dataset.open = String(preview);
   petCard.dataset.pinned = String(catPinned);
   petButton.setAttribute('aria-pressed', String(catPinned));
-  if (compactProfile.matches) petButton.setAttribute('aria-expanded', String(preview));
-  else petButton.removeAttribute('aria-expanded');
+  petButton.setAttribute('aria-expanded', String(preview));
   petCard.dataset.interacting = String(active);
   if (active === catInteracting) return;
   catInteracting = active;
@@ -174,7 +166,7 @@ petButton.addEventListener('click', () => {
   updateCatInteraction();
   if (catPinned) petCard.dispatchEvent(new Event('catpreviewstart'));
 });
-for (const control of [petButton, petPhoto]) {
+for (const control of [petButton]) {
   control.addEventListener('pointerenter', event => {
     if (!isCatControl(control) || event.pointerType !== 'mouse') return;
     activeCatControl = control;
@@ -228,17 +220,6 @@ window.addEventListener('blur', closeCatInteraction);
 compactProfile.addEventListener('change', closeCatInteraction);
 previewClosers.push(closeCatInteraction);
 updateCatInteraction();
-function updatePetPlacement() {
-  if (compactProfile.matches) {
-    petCard.prepend(petButton);
-    document.querySelector('.header-actions').insertBefore(petCard, toggle);
-  } else {
-    document.querySelector('.header-actions').insertBefore(petButton, toggle);
-    document.querySelector('.sidebar').append(petCard);
-  }
-}
-compactProfile.addEventListener('change', updatePetPlacement);
-updatePetPlacement();
 createHoverPreview(
   document.querySelector('.location'),
   document.querySelector('.location-toggle'),

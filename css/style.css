@@ -1,16 +1,16 @@
 :root {
   color-scheme: dark;
-  --bg: #0e0f11;
-  --surface: #17181b;
-  --text: #eeeef0;
-  --body: #c7c8cc;
-  --muted: #9b9da4;
+  --bg: #212121;
+  --surface: #2a2a2a;
+  --text: #e8e8e8;
+  --body: #c8c8c8;
+  --muted: #a1a1a1;
   --accent: #9470c2;
   --accent-hover: #9470c2;
   --pet-purple: #a78bfa;
   --pet-highlight: #f2f0f7;
-  --pet-gray: #9b9da4;
-  --line: #2a2b30;
+  --pet-gray: #a1a1a1;
+  --line: #3a3a3a;
   --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --mono: SFMono-Regular, Consolas, 'Liberation Mono', monospace;
   --type-name: 1.5rem;
@@ -25,17 +25,17 @@
 }
 :root[data-theme='light'] {
   color-scheme: light;
-  --bg: #fafafa;
-  --surface: #f0f0f2;
-  --text: #242529;
-  --body: #494b52;
-  --muted: #686b74;
+  --bg: #f4f4f3;
+  --surface: #ebebea;
+  --text: #2b2b2b;
+  --body: #4b4b4b;
+  --muted: #6b6b6b;
   --accent: #654091;
   --accent-hover: #654091;
   --pet-purple: #704bb5;
   --pet-highlight: #55515e;
   --pet-gray: #727078;
-  --line: #dedfe3;
+  --line: #d8d8d6;
 }
 * { box-sizing: border-box; }
 html { scrollbar-gutter: stable; scroll-padding-top: calc(var(--topbar-height) + 24px); }
@@ -77,13 +77,13 @@ nav:has(a:hover) a:not(:hover)::after { opacity: 0; }
 .theme-toggle .moon { display: none; }
 [data-theme='light'] .theme-toggle .moon { display: block; }
 [data-theme='light'] .theme-toggle .sun { display: none; }
-.pet-card { display: none; position: relative; }
+.pet-card { display: block; position: relative; }
 .pet-toggle { display: grid; place-items: center; width: 36px; height: 36px; padding: 0; border: 0; color: var(--muted); background: transparent; cursor: pointer; font: 600 var(--type-body)/1 var(--mono); }
 .pet-toggle:hover { color: var(--body); }
 .pet-toggle[aria-pressed='true'] { color: #c58049; }
 .pet-toggle svg { width: 18px; height: 18px; }
 .pet-portrait { position: fixed; top: auto; right: calc(16px + env(safe-area-inset-right, 0px)); left: auto; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 5; width: 160px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); box-shadow: 0 12px 32px rgb(0 0 0 / .24); text-align: center; visibility: hidden; opacity: 0; pointer-events: none; }
-.pet-card[data-open='true'] .pet-portrait, .pet-floating-portrait[data-open='true'] { visibility: visible; opacity: 1; }
+.pet-card[data-open='true'] .pet-portrait { visibility: visible; opacity: 1; }
 .pet-photo { display: block; width: 92px; height: 92px; overflow: hidden; border-radius: 50%; border: 1px solid var(--line); margin: 0 auto 8px; }
 .pet-photo img { display: block; width: 100%; height: 100%; object-fit: cover; transform: scale(1.6); transform-origin: 60% 68%; }
 .pet-name { color: var(--body); font-size: var(--type-meta); line-height: 1.7; }
@@ -149,10 +149,6 @@ footer { display: flex; align-items: center; justify-content: flex-end; gap: 16p
   .identity { text-align: center; }
   .profile-photo { margin-left: auto; margin-right: auto; }
   .profile-contact { display: flex; flex-direction: column; align-items: flex-start; width: fit-content; margin-left: auto; margin-right: auto; text-align: left; }
-  .pet-card { display: block; margin-top: auto; padding-top: 24px; border-top: 1px solid var(--line); flex-shrink: 0; }
-  .pet-toggle { display: none; }
-  .header-actions > .pet-toggle { display: grid; }
-  .sidebar .pet-portrait { position: static; width: auto; padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; visibility: visible; opacity: 1; pointer-events: auto; }
 }
 @media (min-width: 1100px) and (max-height: 740px) {
   :root { --sidebar-top: 92px; }
@@ -161,11 +157,9 @@ footer { display: flex; align-items: center; justify-content: flex-end; gap: 16p
   .profile-photo { width: 96px; height: 96px; margin-bottom: 16px; }
   .profile-contact { margin-top: 16px; }
   .profile-contact a, .location { min-height: 30px; }
-  .pet-card { padding-top: 14px; }
 }
 @media (min-width: 1100px) and (max-height: 580px) {
   .sidebar { position: static; height: auto; }
-  .pet-card { margin-top: 24px; }
 }
 @media (width < 1100px) {
   :root { --topbar-height: 60px; }
