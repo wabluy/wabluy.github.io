@@ -29,7 +29,7 @@
 }
 @media (width < 1100px) {
   .about { scroll-margin-top: 56px; }
-  .cat-walk { --cat-sprite-width: 56px; bottom: -56px; }
+  .cat-walk { --cat-sprite-width: 56px; bottom: -40px; }
 }
 @media print {
   .cat-walk { display: none; }
@@ -63,3 +63,47 @@ html.cat-cursor-playing, html.cat-cursor-playing * { cursor: none !important; }
   50% { transform: rotate(16deg); }
 }
 @media (prefers-reduced-motion: reduce) { .cat-feather-toy { animation: none; } }
+
+.cat-home-anchor { position: absolute; inset-inline: 0; bottom: 100%; height: 0; pointer-events: none; visibility: hidden; }
+@media (min-width: 1100px) {
+  .cat-home-anchor { position: fixed; inset-inline: auto; left: var(--cat-lane-left); width: var(--cat-lane-width); bottom: 24px; }
+}
+@media (width < 1100px) { .cat-home-anchor { bottom: -40px; } }
+.cat-walk[data-transported='true'] { z-index: 80; }
+.cat-walk[data-transported='true']::after { display: none; }
+.cat-drop-guide { position: fixed; z-index: 90; height: 2px; background: #c58049; box-shadow: 0 0 8px #c5804960; pointer-events: none; }
+.cat-drop-guide[hidden] { display: none; }
+html.cat-carrying, html.cat-carrying * { cursor: grabbing !important; user-select: none !important; }
+
+@media (min-width: 1100px) {
+  .cat-home-anchor[data-away='true'] { visibility: visible; border-bottom: 1px solid var(--line); }
+}
+
+html.cat-cursor-scruff, html.cat-cursor-scruff * { cursor: grab !important; }
+.cat-scruff-hint {
+  position: fixed; z-index: 92; width: 10px; height: 10px; border: 1px solid #dda16db0;
+  border-radius: 50%; transform: translate(-50%,-50%); pointer-events: none;
+}
+.cat-scruff-hint[hidden], .cat-return-hole[hidden] { display: none; }
+.cat-return-hole {
+  position: fixed; z-index: 79; border-radius: 50%; pointer-events: none;
+  background: radial-gradient(ellipse at 48% 48%, #080706 48%, #33261d 72%, #805039 85%, #c58049 100%);
+  box-shadow: 0 1px 3px #0005; transform-origin: 50% 100%;
+}
+
+/* The same animated value drives the actual rule and its cat anchor. */
+@property --cat-home-gap { syntax: '<length>'; inherits: true; initial-value: 40px; }
+@media (width < 1100px) {
+  .content > .about { --cat-home-gap: 40px; margin-bottom: var(--cat-home-gap); transition: --cat-home-gap 380ms cubic-bezier(.22,.7,.2,1); }
+  .content > .about[data-cat-vacant='true'] { --cat-home-gap: 24px; }
+  .cat-walk, .cat-home-anchor { bottom: calc(0px - var(--cat-home-gap)); }
+}
+.section-disclosure, footer { transition: margin-top 380ms cubic-bezier(.22,.7,.2,1); }
+.section-disclosure[data-cat-occupied='true'], footer[data-cat-occupied='true'] { margin-top: 18px; }
+@media (prefers-reduced-motion: reduce) {
+  .content > .about, .section-disclosure, footer { transition: none; }
+}
+
+html.cat-handling, html.cat-handling *, html.cat-carrying, html.cat-carrying * {
+  -webkit-user-select: none !important; user-select: none !important; -webkit-touch-callout: none !important;
+}
