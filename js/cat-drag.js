@@ -24,6 +24,7 @@
   const smooth=p=>p*p*(3-2*p);
   const width=()=>canvas.getBoundingClientRect().width;
   const holdDuration=180;
+  let portalWanted=true;
   let state=null,holdTimer=0,lastTick=0,releasingCapture=false,lastHover=null;
   function lineRect(element,edge='top') {
     if(!element?.isConnected)return null;
@@ -48,7 +49,18 @@
     return result;
   }
   const currentLine=item=>item.id==='home'?homeRect():lineRect(item.element,item.edge);
+  function nearbyControl(point) {
+    const buttons=['theme-toggle','language-toggle'].map(id=>document.getElementById(id)).filter(Boolean);
+    const nearest=buttons.map(control=>{const r=control.getBoundingClientRect();return {control,r,
+      distance:Math.hypot(point.x-r.left-r.width/2,point.y-r.top-r.height/2)};})
+      .filter(item=>item.r.width>0&&item.r.bottom>0&&item.r.top<innerHeight&&item.distance<=100)
+      .sort((a,b)=>a.distance-b.distance)[0];
+    if(!nearest)return null;
+    const element=document.querySelector('.topbar');
+    return {id:'header',element,edge:'bottom',control:nearest.control};
+  }
   function nearest(point) {
+    const control=nearbyControl(point);if(control)return control;
     const feet=point.y+width()*.8+sy(),x=point.x+sx();
     return targets().filter(item=>x>=item.rect.left-30&&x<=item.rect.left+item.rect.width+30&&Math.abs(item.rect.y-feet)<38)
       .sort((a,b)=>Math.abs(a.rect.y-feet)-Math.abs(b.rect.y-feet))[0]||null;
@@ -75,6 +87,7 @@
   }
   function clearDecorations() {
     guide.hidden=hint.hidden=hole.hidden=true;
+    canvas.style.pointerEvents='auto';
     document.documentElement.classList.remove('cat-carrying','cat-handling');
     canvas.style.removeProperty('clip-path');canvas.style.removeProperty('opacity');
   }
@@ -93,7 +106,9 @@
   function cancel() {
     clearTimeout(holdTimer);holdTimer=0;
     if(!state){clearDecorations();return;}
+    restorePrank(state);
     const id=state.pointerId;state=null;releaseCapture(id);restoreHome();
+    if(!portalWanted)api.hide();
   }
   function restoreOrigin(held) {
     clearDecorations();
@@ -104,19 +119,22 @@
     }
     state=null;const r=homeRect();restoreHome(r?held.from.left-r.left:null,held.facing);
   }
-  function returnHome(now) {
+  function returnHome(now,mode='returning') {
     const r=canvas.getBoundingClientRect(),facing=api.direction();
     api.prepareLift();api.pause();clearDecorations();
-    state={mode:'returning',start:now,from:{x:r.left+sx(),y:r.bottom+sy()},facing};
+    state={mode,start:now,from:{x:r.left+sx(),y:r.bottom+sy()},facing};
+    canvas.style.pointerEvents='none';
   }
   function finishDrop(now) {
     const item=state.target,r=currentLine(item),facing=state.facing;
     if(!r){returnHome(now);return;}
     const x=clamp(state.dropX-r.left,0,Math.max(0,r.width-width()));
     clearDecorations();
-    if(item.id==='home'){state=null;restoreHome(x,facing);return;}
+    if(item.id==='home'){state=null;restoreHome(x,facing);if(!portalWanted)returnHome(now,'exiting');return;}
     // Restore the lane and sprite transform in the same frame: no left-edge flash.
     state={mode:'parked',target:item,deadline:now+10000};setLine(r);api.resume(x,facing);
+    if(!portalWanted)returnHome(now,'exiting');
+    else if(item.control)beginPrank(item,now);
   }
   function release(event,cancelled=false) {
     if(!state||state.pointerId!==event.pointerId||!['arming','dragging'].includes(state.mode))return;
@@ -133,15 +151,91 @@
     api.pause();
     // Moving the cat never opens or closes the content belonging to a separator.
   }
+  const controlValue=control=>control.id==='theme-toggle'?document.documentElement.dataset.theme:document.documentElement.lang;
+  function restorePrank(prank) {
+    if(prank?.mode!=='prank')return;
+    delete prank.target.control.dataset.catPoked;
+    if(prank.pressed && !prank.restored && prank.restoreAllowed && controlValue(prank.target.control)===prank.changed) {
+      prank.restored=true;prank.target.control.click();
+    }
+  }
+  function beginPrank(target,now) {
+    const cat=canvas.getBoundingClientRect(),button=target.control.getBoundingClientRect(),w=width();
+    const center=button.left+button.width/2+sx(),fromX=cat.left+sx();
+    const facing=center>=fromX+w/2?1:-1,goal=center-w*(facing===1?.73:.27);
+    const walkFacing=Math.sign(goal-fromX)||facing,oldFacing=api.direction();
+    api.pause();
+    state={mode:'prank',target,start:now,fromX,goal,facing,walkFacing,oldFacing,
+      turnIn:api.reduced()||oldFacing===walkFacing?0:240,turnOut:api.reduced()||walkFacing===facing?0:240,
+      walkDuration:api.reduced()?0:Math.max(120,Math.abs(goal-fromX)/40*1000),restoreAllowed:true};
+    canvas.style.pointerEvents='none';
+  }
+  function tickPrank(now) {
+    const prank=state,r=currentLine(prank.target);if(!r){restorePrank(prank);returnHome(now);return;}
+    const w=width(),elapsed=Math.max(0,now-prank.start),floor=r.y+w*.025;
+    if(elapsed<prank.turnIn){
+      const p=elapsed/prank.turnIn;
+      floatCat(prank.fromX,floor,'turn',0,p,0,p<.5?prank.oldFacing:prank.walkFacing);return;
+    }
+    const walking=elapsed-prank.turnIn;
+    if(walking<prank.walkDuration){
+      const p=smooth(walking/prank.walkDuration),x=prank.fromX+(prank.goal-prank.fromX)*p;
+      floatCat(x,floor,'walk',0,0,Math.abs(x-prank.fromX)/(w/40),prank.walkFacing);return;
+    }
+    const turning=walking-prank.walkDuration;
+    if(turning<prank.turnOut){
+      const p=turning/prank.turnOut;
+      floatCat(prank.goal,floor,'turn',0,p,0,p<.5?prank.walkFacing:prank.facing);return;
+    }
+    const action=turning-prank.turnOut,control=prank.target.control;
+    const tap=action<700?action:action>=2500&&action<3200?action-2500:null;
+    floatCat(prank.goal,floor,tap===null?'idle':'button-tap',0,tap===null?0:api.reduced()?.5:tap/700,0,prank.facing);
+    if(tap!==null&&tap>=280&&tap<=480)control.dataset.catPoked='true';else delete control.dataset.catPoked;
+    if(action>=350&&!prank.pressed){
+      prank.original=controlValue(control);prank.pressed=true;control.click();prank.changed=controlValue(control);
+    }
+    if(action>=2850)restorePrank(prank);
+    if(action>=3200){
+      clearDecorations();state={mode:'parked',target:prank.target,deadline:now+10000};
+      setLine(r);api.resume(clamp(prank.goal-r.left,0,r.width-w),prank.facing);
+    }
+  }
+  // A reader's explicit choice takes precedence over the cat's temporary joke.
+  document.addEventListener('click',event=>{
+    if(state?.mode==='prank'&&event.isTrusted&&event.target.closest?.('button')===state.target.control)state.restoreAllowed=false;
+  },true);
   function showHole(x,y,openness) {
     const w=width();hole.hidden=false;
     Object.assign(hole.style,{left:`${x-sx()}px`,top:`${y-sy()}px`,width:`${w*.4}px`,height:`${w*.74}px`,transform:`translate(-50%,-100%) scaleX(${Math.max(.001,openness)})`});
   }
+  function finishHidden() {
+    state=null;restoreHome();api.hide();
+  }
+  function appear() {
+    portalWanted=true;
+    restoreHome();api.pause();
+    state={mode:'entering',start:performance.now()};
+    canvas.style.pointerEvents='none';
+    // Establish the clipped first frame before the browser can paint the sprite.
+    tickPortal(state.start);
+  }
+  function setVisible(wanted) {
+    portalWanted=wanted;
+    if(wanted)return; // An exit already underway finishes before the latest reopening.
+    if(state&&['entering','exiting','returning','landing'].includes(state.mode))return;
+    if(state?.mode==='dragging'){release({pointerId:state.pointerId},true);return;}
+    if(state?.mode==='arming') {
+      const held=state;clearTimeout(holdTimer);holdTimer=0;
+      releaseCapture(held.pointerId);restoreOrigin(held);
+    }
+    restorePrank(state);
+    returnHome(performance.now(),'exiting');
+  }
   function tickPortal(now) {
     const r=homeRect();if(!r){cancel();return;}
     const w=width(),goalX=r.left+Math.max(0,(r.width-w)/2),goalY=r.y+w*.025;
-    if(api.reduced()){state=null;restoreHome(goalX-r.left,1);return;}
-    const elapsed=now-state.start;
+    if(api.reduced()){if(!portalWanted){finishHidden();return;}state=null;restoreHome(goalX-r.left,1);api.presented();return;}
+    const elapsed=Math.max(0,now-state.start)+(state.mode==='entering'?1000:0);
     // The full cat enters a hole at its nose before changing locations out of sight.
     if(elapsed<1000) {
       const p=clamp((elapsed-180)/650,0,1),f=state.facing;
@@ -158,6 +252,11 @@
       canvas.style.opacity=elapsed>=830?'0':'1';
       return;
     }
+    if(state.mode==='exiting' && elapsed>=1000){
+      if(portalWanted)appear();else finishHidden();
+      return;
+    }
+    if(state.mode==='returning' && elapsed>=1000 && !portalWanted && !state.homeReserved){finishHidden();return;}
     if(!state.homeReserved){reserveLine(null);homeVacant(false);state.homeReserved=true;}
     const enter=elapsed-1000,p=clamp((enter-180)/650,0,1),holeX=goalX;
     const left=holeX-w+w*smooth(p);
@@ -166,7 +265,10 @@
     floatCat(left,goalY,p<1?'sprint':'idle',0,0,40*smooth(p),1);
     canvas.style.clipPath=`inset(0 0 0 ${clamp((holeX-left)/w,0,1)*100}%)`;
     canvas.style.opacity='1';
-    if(enter>=1000){state=null;restoreHome(goalX-r.left,1);}
+    if(enter>=1000){
+      state=null;restoreHome(goalX-r.left,1);
+      if(!portalWanted)returnHome(now,'exiting');else api.presented();
+    }
   }
   function tick(now) {
     const dt=Math.min(.05,Math.max(0,(now-lastTick)/1000));lastTick=now;
@@ -217,10 +319,11 @@
       }
       return false;
     }
-    if(state.mode==='returning'){tickPortal(now);return true;}
+    if(state.mode==='prank'){tickPrank(now);return true;}
+    if(['returning','entering','exiting'].includes(state.mode)){tickPortal(now);return true;}
     return false;
   }
-  api.install({tick,cancel,isAway:()=>!!state,blocksInput:()=>!!state&&(state.mode!=='parked'||!!state.platformMotion)});
+  api.install({tick,cancel,appear,setVisible,isAway:()=>!!state,blocksInput:()=>!!state&&(state.mode!=='parked'||!!state.platformMotion)});
   function followSectionMotion(event) {
     if(state?.mode!=='parked')return;
     const source=event.target;
@@ -235,7 +338,7 @@
   }
   document.addEventListener('sectionmotionstart',followSectionMotion);
   document.querySelector('.background-details')?.addEventListener('backgroundmotionstart',followSectionMotion);
-  canvas.style.pointerEvents='auto';canvas.style.touchAction='none';canvas.draggable=false;
+  canvas.style.pointerEvents=state?'none':'auto';canvas.style.touchAction='none';canvas.draggable=false;
   document.addEventListener('selectstart',event=>{if(state&&['arming','dragging'].includes(state.mode))event.preventDefault();},true);
   document.addEventListener('dragstart',event=>{if(state&&['arming','dragging'].includes(state.mode))event.preventDefault();},true);
   canvas.addEventListener('pointerdown',event=>{

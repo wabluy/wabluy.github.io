@@ -163,6 +163,11 @@
     }
   }
 
+  function pawEdge(x,y,width=3) {
+    // A solid sprite pixel stays crisp in motion; no CSS filter re-rasterizes the cat.
+    if(document.documentElement.dataset?.theme==='light')rect(x,y,width,1,'#b0957d');
+  }
+
   function limb(points, far = false) {
     line(points, color.outline, 4);
     line(points, far ? color.stripe : color.orange, 2);
@@ -183,6 +188,7 @@
     line([mixPoint(root,knee,.5),knee,end],color.outline,far?2:3);
     line([root,knee,end],far?color.stripe:color.orange,2);
     rect(end[0] - 1, end[1] - 1, far ? 2 : 3, 2, far ? color.orange : color.cream);
+    if(!far)pawEdge(end[0]-1,end[1]);
   }
 
   function frontLeg(root, foot, far = false) {
@@ -196,6 +202,7 @@
     polygon([[rx-half+.5,ry-1],[rx+half-.5,ry-1],[ex+.6,ey],[fx+.5,fy-2],
       [fx+1.5,fy-1],[fx+1,fy],[fx-1,fy],[fx-.6,fy-2],[ex-half+.6,ey]],color.orange);
     polygon([[fx-1,fy-1],[fx+1,fy-1],[fx+1.5,fy],[fx+1,fy+.6],[fx-1,fy+.6]],far?color.light:color.cream);
+    pawEdge(fx-1,fy,2);
   }
 
   function tail(bob, sway = 0, sitting = false) {
@@ -391,7 +398,7 @@
       const paw = [12, 26 - 16 * settle];
       line([[16, 24], knee, paw], color.outline, 4);
       line([[16, 24], knee, paw], color.orange, 2);
-      rect(paw[0] - 1, paw[1] - 1, 3, 3, color.cream);
+      rect(paw[0] - 1, paw[1] - 1, 3, 3, color.cream);pawEdge(paw[0]-1,paw[1]+1);
       polygon([[16, 21], [22, 20], [24, 24], [20, 26], [16, 25]], color.cream);
       head(-8*dip,2*dip,settle>.25?'content':'normal',0,.4*dip);
       if (settle > .8 && cycle > .65) rect(21, 24, 2, 1, color.pink);
@@ -402,7 +409,7 @@
       head(-4*dip,1.5*dip,settle>.25?'content':'normal',0,.32*dip);
       groundLeg([27, 24], [29, 26 - 2 * settle], false, 3);
       if (settle > .8 && cycle > .65) rect(28, 23, 2, 1, color.pink);
-      rect(13, 25, 4, 2, color.cream);
+      rect(13, 25, 4, 2, color.cream);pawEdge(13,26,4);
     }
   }
 
@@ -431,7 +438,7 @@
     head(-4 * tuck, 3 * tuck, 'aim', tuck);
     poseTail([[12,23],[7,24],[6,22],[6,20],[8,17]],tuck);
     rect(22, 25, 3, 2, color.cream);
-    rect(28, 25, 3, 2, color.cream);
+    rect(28, 25, 3, 2, color.cream);pawEdge(22,26);pawEdge(28,26);
   }
 
   function drawFalling(progress) {
@@ -644,13 +651,15 @@
     drawWalk(distance);
   }
 
-  function drawPlay(frame, progress) {
+  function drawPlay(frame, progress, singleTap = false) {
     const smooth = value => { const t = Math.max(0, Math.min(1, value)); return t * t * (3 - 2 * t); };
     const upright = smooth(progress / .17) * (1 - smooth((progress - .82) / .18)) * actionWeight;
     const mix = (a, b) => a + (b - a) * upright;
     // Fixed-length bones rotate at their joints; no independently sliding elbow/paw.
     // Angles are measured from the forward axis, with positive angles pointing down.
-    const poses = [
+    const poses = singleTap ? [
+      [0,90,90,90,90], [.5,-25,-55,85,75], [.62,-25,-55,85,75], [1,90,90,90,90]
+    ] : [
       [0, 90, 90, 90, 90],
       [.17, 65, -15, 75, 15],
       [.30, -35, -70, 65, -15],
@@ -677,9 +686,10 @@
       line([shoulder, elbow, paw], color.outline, 3);
       line([shoulder, elbow, paw], far ? color.stripe : color.orange, 2);
       rect(paw[0] - 1, paw[1] - 1, 3, 2, far ? color.light : color.cream);
+      pawEdge(paw[0]-1,paw[1]);
     };
     const morph = (standing,seated) => mixContour(standing,seated,upright);
-    tail(0, Math.round(Math.sin(progress * Math.PI * 4) * upright));
+    tail(0, Math.round(Math.sin(progress * Math.PI * (singleTap ? 1 : 4)) * upright));
     limb([[14, 23], [14, 25], [14, 26]], true);
     polygon(morph(
       [[6.5,17],[8.5,14],[11.8,11.7],[16,11.7],[19,13],[23,11],[26,14],[28,17],[28,20],[25,23],[21,22],[19,23.3],[17,24],[15,24],[13,23.3],[11,22.4],[7.5,22.4],[5.5,20]],
@@ -702,6 +712,7 @@
     else if (kind === 'scared') drawScared(progress);
     else if (kind === 'falling') drawFalling(progress);
     else if (kind === 'grab') drawPlay(frame, progress);
+    else if (kind === 'button-tap') drawPlay(frame, progress, true);
     else if (kind === 'pounce') drawPounce(progress, frame);
     else if (kind === 'tail-enjoy') drawTailEnjoy(progress);
     else if (kind === 'pet') drawPet(progress);
@@ -719,7 +730,7 @@
     else if(kind==='walk')drawSprint(gaitDistance,gaitBlend);
     else drawWalk(gaitDistance);
   }
-  const restingActions=new Set(['stretch','scratch','groom','belly-groom','sploot','belly','pet','tail-enjoy','grab','pounce','yawn','scared']);
+  const restingActions=new Set(['button-tap','stretch','scratch','groom','belly-groom','sploot','belly','pet','tail-enjoy','grab','pounce','yawn','scared']);
   function drawExit(source,progress) {
     actionWeight=(source.exitWeight??1)*(1-easePose(progress));
     postureOverride=(easePose(source.progress/.16)*(1-easePose((source.progress-.84)/.16)))*actionWeight;
@@ -823,7 +834,7 @@
   }
 
   function lowerLane() {
-    if (pet.dataset.dismissed === 'true') { resetLane(); return; }
+    if (transportDriver?.isAway() || pet.dataset.dismissed === 'true') return;
     if (!laneMotion || !desktopLane.matches) return;
     laneMotion = { kind: 'falling', start: performance.now(), from: laneOffset, catFrom: catLift };
     stage.dataset.lane = 'falling';
@@ -966,7 +977,7 @@
     frameRequest = 0;
     if (!active) return;
     if (document.hidden || !stage.isConnected || !pet.isConnected) { stop(); return; }
-    if (transportDriver?.tick(now)) { if (active) frameRequest = requestAnimationFrame(tick); return; }
+    if (transportDriver?.tick(now)) { if (active && !frameRequest) frameRequest = requestAnimationFrame(tick); return; }
     if (reducedMotion.matches) { if (transportDriver?.isAway()) frameRequest = requestAnimationFrame(tick); return; }
     if (tickPoseHandoff(now)) { frameRequest=requestAnimationFrame(tick);return; }
     if (tickLane(now)) { if (active) frameRequest = requestAnimationFrame(tick); return; }
@@ -1060,7 +1071,7 @@
     // A frame timestamp can precede activation within the same rendering frame.
     let elapsed = Math.max(0, now - startedAt);
     if (elapsed >= totalDuration) {
-      if (pet.dataset.pinned !== 'true') { stop(); return; }
+      if (pet.dataset.pinned !== 'true' && pet.dataset.interacting !== 'true') { dismiss(); return; }
       requestTurn(-direction, now);
       buildSequence();
       startedAt = now;
@@ -1088,7 +1099,8 @@
   }
 
   function activate() {
-    if (active || document.hidden || !stage.isConnected) return;
+    if (active) { transportDriver?.setVisible(true); return; }
+    if (document.hidden || !stage.isConnected) return;
     const bounds = stage.getBoundingClientRect();
     if (!bounds.width || !bounds.height || bounds.bottom < 0 || bounds.top > innerHeight) return;
     active = true;
@@ -1106,7 +1118,8 @@
     }
     if (reducedMotion.matches) {
       canvas.style.transform = `translate3d(${Math.round(travel * .15)}px,0,0)`;
-      stillTimer = setTimeout(() => { if (pet.dataset.pinned !== 'true') stop(); }, 1500);
+      stillTimer = setTimeout(() => { if (pet.dataset.interacting !== 'true') dismiss(); }, 1500);
+      transportDriver?.appear();
       return;
     }
     direction = 1;
@@ -1114,6 +1127,7 @@
     startedAt = performance.now();
     lastPaint = -Infinity;
     frameRequest = requestAnimationFrame(tick);
+    transportDriver?.appear();
   }
 
   function buildSequence(startPosition = 0) {
@@ -1393,7 +1407,9 @@
   window.addEventListener('blur', () => { endFeatherFollow(performance.now()); releaseCharge(null, true); cursorPoint = null; clearCursor(); });
 
   stage.catTransport = {
-    install(driver) { transportDriver = driver; },
+    install(driver) { transportDriver = driver; if(active)driver.appear(); },
+    hide: stop,
+    presented() { if(pet.dataset.open==='true')raiseLane(); },
     active: () => active,
     direction: () => turnMotion && turnMotion.progress < .5 ? turnMotion.from : direction,
     reduced: () => reducedMotion.matches,
@@ -1473,10 +1489,11 @@
 
   document.querySelector('.background-details')?.addEventListener('backgroundmotionstart', beginBackgroundMotion);
   pet.addEventListener('catpreviewstart', activate);
-  pet.addEventListener('catpreviewend', () => {
-    if (pet.dataset.dismissed === 'true' || !laneMotion) stop();
-    else lowerLane();
-  });
+  function dismiss() {
+    if(active && transportDriver)transportDriver.setVisible(false);
+    else stop();
+  }
+  pet.addEventListener('catpreviewend', dismiss);
   pet.addEventListener('catlaneraise', raiseLane);
   pet.addEventListener('catlanelower', lowerLane);
   window.addEventListener('resize', () => {

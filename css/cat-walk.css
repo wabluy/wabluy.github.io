@@ -132,3 +132,7 @@ html.cat-cursor-scruff, html.cat-cursor-scruff * { cursor: grab !important; }
 html.cat-handling, html.cat-handling *, html.cat-carrying, html.cat-carrying * {
   -webkit-user-select: none !important; user-select: none !important; -webkit-touch-callout: none !important;
 }
+
+/* A tiny press accent when BoBo taps a header control. */
+.header-actions button[data-cat-poked='true'] { color: #c58049; background: #c5804922; transform: translateY(1px); }
+
