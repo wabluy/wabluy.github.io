@@ -254,9 +254,6 @@
         } else box(eyeX + dx, 13 + dy, 3, 3, color.eye);
         box(eyeX + dx, 13 + dy, 1, 1, color.cream);
       }
-      box(31 + dx, 19 + dy, 1, 1, color.outline);
-      box(30 + dx, 20 + dy, 1, 1, color.outline);
-      box(32 + dx, 20 + dy, 1, 1, color.outline);
     } else {
       box(25 + dx, 14 + dy, 3, 1, color.eye);
       box(34 + dx, 14 + dy, 3, 1, color.eye);
@@ -265,7 +262,6 @@
         box(34 + dx, 14 + dy, 3, 1, color.orange);
         inkLine([[25 + dx, 15 + dy], [26 + dx, 14 + dy], [27 + dx, 15 + dy]], color.eye);
         inkLine([[34 + dx, 15 + dy], [35 + dx, 14 + dy], [36 + dx, 15 + dy]], color.eye);
-        inkLine([[30 + dx, 19 + dy], [31 + dx, 20 + dy], [32 + dx, 19 + dy]], color.outline);
       }
       if (expression === 'yawn' && mouth > 0) {
         // Keep the nose above the mouth; the small canines sit on the upper jaw.
@@ -282,6 +278,11 @@
           }
         }
       }
+    }
+    if (!(expression === 'yawn' && mouth > 0)) {
+      // Two tiny cheek curves meet beneath the nose in a soft pixel W.
+      inkLine([[29 + dx, 19 + dy], [30 + dx, 20 + dy], [31 + dx, 19 + dy],
+        [32 + dx, 20 + dy], [33 + dx, 19 + dy]], color.outline);
     }
   }
 
