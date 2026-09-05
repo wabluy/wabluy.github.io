@@ -247,10 +247,45 @@ createHoverPreview(
 );
 const backgroundDetails = document.querySelector('.background-details');
 const backgroundSummary = backgroundDetails.querySelector('summary');
+const backgroundText = backgroundDetails.querySelector('p');
 const backgroundReducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
 let backgroundAnimation = null;
+let backgroundTextAnimation = null;
 let backgroundExpanded = !compactProfile.matches;
+function clearBackgroundTextReveal(preserve = false) {
+  const visibleSize = preserve ? getComputedStyle(backgroundText).maskSize : null;
+  if (backgroundTextAnimation) { backgroundTextAnimation.cancel(); backgroundTextAnimation = null; }
+  if (preserve && visibleSize && visibleSize !== 'auto') {
+    backgroundText.style.maskSize = visibleSize;
+    backgroundText.style.webkitMaskSize = visibleSize;
+    return;
+  }
+  for (const property of ['mask-image','mask-size','mask-repeat','-webkit-mask-image','-webkit-mask-size','-webkit-mask-repeat']) {
+    backgroundText.style.removeProperty(property);
+  }
+}
+function revealBackgroundText(duration, fromHeight) {
+  const lineHeight = parseFloat(getComputedStyle(backgroundText).lineHeight) || 27;
+  const height = backgroundText.getBoundingClientRect().height;
+  const fade = Math.min(14, lineHeight * .5);
+  const alreadyVisible = Math.max(lineHeight, fromHeight - backgroundSummary.getBoundingClientRect().height - 12);
+  const previousMask = /([\d.]+)px$/.exec(backgroundText.style.maskSize || '');
+  const preserved = previousMask ? Math.max(lineHeight, Number(previousMask[1]) - fade) : height;
+  const first = Math.min(height, alreadyVisible, preserved);
+  const mask = `linear-gradient(to bottom, #000 calc(100% - ${fade}px), transparent 100%)`;
+  backgroundText.style.maskImage = backgroundText.style.webkitMaskImage = mask;
+  backgroundText.style.maskRepeat = backgroundText.style.webkitMaskRepeat = 'no-repeat';
+  // Match the cat's 70 ms hesitation and gravity curve; the first line is visible immediately.
+  const frames = Array.from({length:25}, (_,i) => {
+    const offset = i / 24;
+    const fall = Math.max(0, Math.min(1, (offset * duration - 70) / (duration - 70)));
+    const visible = first + (height - first) * fall * fall + fade;
+    return {offset, maskSize:`100% ${visible}px`, webkitMaskSize:`100% ${visible}px`};
+  });
+  backgroundTextAnimation = backgroundText.animate(frames, {duration,easing:'linear',fill:'forwards'});
+}
 function updateBackgroundVisibility() {
+  clearBackgroundTextReveal();
   if (backgroundAnimation) { backgroundAnimation.onfinish = null; backgroundAnimation.cancel(); backgroundAnimation = null; }
   backgroundExpanded = !compactProfile.matches;
   backgroundDetails.open = backgroundExpanded;
@@ -259,6 +294,7 @@ function updateBackgroundVisibility() {
   backgroundDetails.style.removeProperty('overflow');
 }
 function animateBackground(expanded) {
+  clearBackgroundTextReveal(true);
   const from = backgroundDetails.getBoundingClientRect().height;
   if (backgroundAnimation) { backgroundAnimation.onfinish = null; backgroundAnimation.cancel(); }
   backgroundExpanded = expanded;
@@ -267,6 +303,7 @@ function animateBackground(expanded) {
   backgroundDetails.open = expanded;
   const to = backgroundDetails.getBoundingClientRect().height;
   if (backgroundReducedMotion.matches || Math.abs(from - to) < 1) {
+    clearBackgroundTextReveal();
     backgroundDetails.style.removeProperty('overflow');
     backgroundAnimation = null;
     return;
@@ -276,6 +313,7 @@ function animateBackground(expanded) {
   backgroundDetails.style.height = `${from}px`;
   backgroundDetails.style.overflow = 'hidden';
   const duration = expanded ? 620 : 420;
+  if (expanded) revealBackgroundText(duration, from);
   backgroundDetails.dispatchEvent(new CustomEvent('backgroundmotionstart', {detail:{from,to,duration,expanded}}));
   const animation = backgroundDetails.animate([{height:`${from}px`},{height:`${to}px`}], {
     duration, easing:'cubic-bezier(.22,.7,.2,1)', fill:'forwards'
@@ -288,6 +326,7 @@ function animateBackground(expanded) {
     backgroundDetails.style.removeProperty('overflow');
     backgroundAnimation = null;
     animation.cancel();
+    clearBackgroundTextReveal();
   };
 }
 backgroundSummary.addEventListener('click', event => {
