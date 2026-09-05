@@ -252,7 +252,9 @@
     // A small mouth-side marking fades into the cream fur at its pixel edges.
     box(28 + dx, 18 + dy, 2, 2, `${color.orange}55`);
     box(29 + dx, 18 + dy, 1, 1, `${color.orange}88`);
-    box(28 + dx, 19 + dy, 1, 1, `${color.orange}55`);
+    box(28 + dx, 19 + dy, 1, 1, color.orange);
+    box(27 + dx, 19 + dy, 1, 1, `${color.orange}33`);
+    box(28 + dx, 20 + dy, 1, 1, `${color.orange}33`);
     box(29 + dx, 19 + dy, 1, 1, color.orange);
     box(30 + dx, 19 + dy, 1, 1, `${color.orange}55`);
     box(29 + dx, 20 + dy, 1, 1, `${color.orange}44`);
@@ -408,8 +410,7 @@
     ctx.restore();
     // Short paws and a wrapped tail make a compact ball, without stretching the torso.
     head(-4 * tuck, 3 * tuck, 'aim', tuck);
-    line([[12, 23], [7, 24], [6, 20], [8, 17]], color.outline, 4);
-    line([[12, 23], [7, 24], [6, 20], [8, 17]], color.orange, 2);
+    poseTail([[12,23],[7,24],[6,22],[6,20],[8,17]],tuck);
     rect(22, 25, 3, 2, color.cream);
     rect(28, 25, 3, 2, color.cream);
   }
@@ -671,7 +672,7 @@
     rect(13, mix(14,19), 2, 3, color.stripe);
     rect(18, mix(13,15), 2, 3, color.stripe);
     limb([[16, 23], [16, 25], [16, 26]]);
-    head(-Math.round(4 * upright), -Math.round(3 * upright));
+    head(-Math.round(4 * upright), -Math.round(3 * upright), upright>.2?'aim':'normal', upright);
     foreleg(true);
     foreleg(false);
   }
@@ -703,10 +704,11 @@
     actionWeight=(source.exitWeight??1)*(1-easePose(progress));
     postureOverride=(easePose(source.progress/.16)*(1-easePose((source.progress-.84)/.16)))*actionWeight;
     if(source.kind==='turn')drawTurn(source.progress+(source.progress<.5?-source.progress:1-source.progress)*easePose(progress));
-    else if(['walk','chase','sprint','idle','falling','scared'].includes(source.kind)) {
-      const cycle=4/.65,d=source.distance||0;
-      drawWalk(d+(Math.ceil(d/cycle)*cycle-d)*easePose(progress));
-    } else drawAction(source.kind,source.frame,source.progress);
+    else if(['walk','chase','sprint'].includes(source.kind)) {
+      const cycle=4/.65,d=source.distance||0,ease=easePose(progress);
+      drawSprint(d+(Math.ceil(d/cycle)*cycle-d)*ease,(source.gaitBlend??0)*(1-ease));
+    } else if(source.kind==='idle')drawWalk(0);
+    else drawAction(source.kind,source.frame,source.progress);
     actionWeight=1;postureOverride=null;
   }
   function tickPoseHandoff(now) {
@@ -749,7 +751,7 @@
     tailRoot = { x: 11, y: 21 };
     stage.dataset.action = kind;
     drawAction(kind,frame,progress);
-    lastPose={kind,frame,progress,distance:gaitDistance};
+    lastPose={kind,frame,progress,distance:gaitDistance,gaitBlend};
     if (cursorPoint && active) {
       const point = pointerOnSprite(cursorPoint);
       showCursor(point ? cursorZone(point) : null);
