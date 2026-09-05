@@ -80,7 +80,7 @@ nav:has(a:hover) a:not(:hover)::after { opacity: 0; }
 .pet-card { display: block; position: relative; }
 .pet-toggle { display: grid; place-items: center; width: 36px; height: 36px; padding: 0; border: 0; color: var(--muted); background: transparent; cursor: pointer; font: 600 var(--type-body)/1 var(--mono); }
 .pet-toggle:hover { color: var(--body); }
-.pet-toggle[aria-pressed='true'] { color: #c58049; }
+.pet-toggle[aria-pressed='true'], .pet-toggle[data-pressing='true'] { color: #c58049; }
 .pet-toggle svg { width: 18px; height: 18px; }
 .pet-portrait { position: fixed; top: auto; right: calc(16px + env(safe-area-inset-right, 0px)); left: auto; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 5; width: 160px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); box-shadow: 0 12px 32px rgb(0 0 0 / .24); text-align: center; visibility: hidden; opacity: 0; pointer-events: none; }
 .pet-card[data-open='true'] .pet-portrait { visibility: visible; opacity: 1; }

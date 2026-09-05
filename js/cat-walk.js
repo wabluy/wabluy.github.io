@@ -69,6 +69,8 @@
   let tailStarted = null;
   let walkAway = null;
   let cursorPoint = null;
+  let featherFollowing = false;
+  let followTime = 0;
   let tailRoot = { x: 11, y: 21 };
   let petTimer = 0;
   let headRegion = { left: 20, right: 40, top: 3, bottom: 23 };
@@ -307,6 +309,38 @@
     groundLeg([18 + scoot, 23], foot, false, 4.5);
   }
 
+  function drawGroom(frame, progress, belly = false) {
+    const ease = t => { t = Math.max(0, Math.min(1, t)); return t * t * (3 - 2 * t); };
+    const settle = ease(progress / .16) * (1 - ease((progress - .88) / .12));
+    const cycle = (1 - Math.cos(frame / 9 * Math.PI * 2)) / 2;
+    const dip = settle * (.55 + .45 * cycle);
+    tail(0, 0, true);
+    polygon([[10, 23], [12, 17], [17, 14], [22, 14], [25, 18], [26, 24], [23, 26], [13, 26]], color.outline);
+    polygon([[11, 23], [13, 18], [17, 15], [21, 15], [24, 18], [25, 23], [22, 25], [13, 25]], color.orange);
+    rect(14, 18, 7, 3, color.light);
+    rect(15, 16, 2, 3, color.stripe);
+    rect(18, 25, 4, 2, color.cream);
+    if (belly) {
+      // A seated cat balances on one haunch, raises its hind leg, and folds toward its belly.
+      const knee = [12, 22 - 7 * settle];
+      const paw = [12, 26 - 16 * settle];
+      line([[16, 24], knee, paw], color.outline, 4);
+      line([[16, 24], knee, paw], color.orange, 2);
+      rect(paw[0] - 1, paw[1] - 1, 3, 3, color.cream);
+      polygon([[16, 21], [22, 20], [24, 24], [20, 26], [16, 25]], color.cream);
+      head(-8 * dip, 2 * dip, 'content', 0, .4 * dip);
+      if (settle > .8 && cycle > .65) rect(21, 24, 2, 1, color.pink);
+      groundLeg([25, 23], [27, 26], false, 3.5);
+    } else {
+      // Repeated head dips bring the muzzle down onto the foreleg fur.
+      groundLeg([25, 22], [26, 26], true);
+      head(-4 * dip, 1.5 * dip, 'content', 0, .32 * dip);
+      groundLeg([27, 24], [29, 26 - 2 * settle], false, 3);
+      if (settle > .8 && cycle > .65) rect(28, 23, 2, 1, color.pink);
+      rect(13, 25, 4, 2, color.cream);
+    }
+  }
+
   function drawScared(progress = 1) {
     const tuck = Math.max(0, Math.min(1, progress));
     ctx.save();
@@ -527,6 +561,8 @@
     else if (kind === 'chase') drawChase(gaitDistance);
     else if (kind === 'yawn') drawYawn(progress);
     else if (kind === 'scratch') drawScratch(frame, progress);
+    else if (kind === 'groom') drawGroom(frame, progress);
+    else if (kind === 'belly-groom') drawGroom(frame, progress, true);
     else if (kind === 'idle') drawWalk(0);
     else drawWalk(gaitDistance);
     if (cursorPoint && active) {
@@ -572,6 +608,7 @@
     chargePointer = null;
     stroke = null;
     clearCursor();
+    featherFollowing = false;
     laneMotion = { kind: 'rising', start: performance.now(), from: laneOffset, catFrom: catLift, target };
     stage.dataset.lane = 'rising';
     lastPaint = -Infinity;
@@ -612,11 +649,11 @@
       }
     } else if (motion.kind === 'landing') {
       progress = 1 - .25 * clamp(elapsed / 160);
-      if (elapsed >= 160) { laneMotion = { kind: 'grooming', start: now }; stage.dataset.lane = 'grooming'; }
+      if (elapsed >= 160) { laneMotion = { kind: 'grooming', start: now, variant: Math.random() < .65 ? 'groom' : 'belly-groom' }; stage.dataset.lane = 'grooming'; }
     } else if (motion.kind === 'grooming') {
-      pose = 'scratch';
+      pose = motion.variant || 'groom';
       progress = clamp(elapsed / 2400);
-      // Several quick chin rubs, then a small pause before walking away.
+      // A few reassuring licks always precede the return to random activity.
       frame = Math.floor(elapsed / 75);
       if (elapsed >= 2400) {
         resetLane();
@@ -644,6 +681,7 @@
     chargePointer = null;
     walkAway = null;
     cursorPoint = null;
+    featherFollowing = false;
     clearCursor();
     stroke = null;
     clearTimeout(petTimer);
@@ -667,6 +705,7 @@
       canvas.style.transform = `translate3d(${currentX}px,0,0) scaleX(${direction})`;
       startInput(input.kind, input.event, now);
     }
+    if (tickFeatherFollow(now)) { frameRequest = requestAnimationFrame(tick); return; }
     if (walkAway !== null) {
       const elapsed = Math.max(0, now - walkAway.start);
       const progress = Math.min(1, elapsed / 3000);
@@ -813,9 +852,9 @@
     }
     for (let i = 0; i < stopCount; i++) {
       walkTo(startPosition + (1 - startPosition) * (i + between(.65, 1.25)) / (stopCount + 1));
-      const choices = ['belly', 'sploot', 'yawn', 'scratch'].filter(kind => kind !== previousAction);
+      const choices = ['belly', 'sploot', 'yawn', 'scratch', 'groom', 'belly-groom'].filter(kind => kind !== previousAction);
       const kind = choices[Math.floor(Math.random() * choices.length)];
-      const duration = kind === 'belly' ? between(2600, 3400)
+      const duration = (kind === 'groom' || kind === 'belly-groom') ? between(2400, 3000) : kind === 'belly' ? between(2600, 3400)
         : kind === 'sploot' ? between(2100, 3200) : between(1800, 2800);
       sequence.push({ kind, duration, from: position, to: position, frameMs: between(90, 140) });
       previousAction = kind;
@@ -844,7 +883,7 @@
     if (point.x >= headRegion.left - 3 && point.x <= headRegion.right + 3 &&
         point.y >= headRegion.top - 5 && point.y <= headRegion.top + 16) return 'head';
     if (Math.abs(point.x - tailRoot.x) <= 6 && Math.abs(point.y - tailRoot.y) <= 7) return 'tail';
-    if (point.x > headRegion.right && point.x < headRegion.right + 66 &&
+    if (((point.x > headRegion.right && point.x < headRegion.right + 66) || (point.x < 0 && point.x > -66)) &&
         point.y >= headRegion.top - 12 && point.y <= headRegion.bottom + 12) return 'front';
     return null;
   }
@@ -862,8 +901,54 @@
       y: (event.clientY - bounds.top) / bounds.height * 28 };
   }
 
+  function faceFeather(event) {
+    const bounds = canvas.getBoundingClientRect();
+    const nextDirection = event.clientX < bounds.left + bounds.width / 2 ? -1 : 1;
+    if (direction !== nextDirection) {
+      direction = nextDirection;
+      canvas.style.transform = `translate3d(${currentX}px,0,0) scaleX(${direction})`;
+    }
+  }
+
+  function featherTarget(event, gap = 8) {
+    const stageLeft = stage.getBoundingClientRect().left;
+    const width = canvas.getBoundingClientRect().width;
+    const target = event.clientX - stageLeft - (direction === 1 ? width + gap : -gap);
+    return Math.max(0, Math.min(travel, target));
+  }
+
+  function endFeatherFollow(now) {
+    if (!featherFollowing) return;
+    featherFollowing = false;
+    const along = travel ? (direction === 1 ? currentX / travel : 1 - currentX / travel) : 0;
+    buildSequence(Math.max(0, Math.min(.999, along)));
+    startedAt = now;
+    lastPaint = -Infinity;
+  }
+
+  function tickFeatherFollow(now) {
+    if (!featherFollowing || playStarted !== null || petStarted !== null || tailStarted !== null) return false;
+    const point = cursorPoint && pointerOnSprite(cursorPoint);
+    if (!point || cursorZone(point) !== 'front') { endFeatherFollow(now); return false; }
+    faceFeather(cursorPoint);
+    const target = featherTarget(cursorPoint);
+    const dt = Math.max(0, Math.min(.06, (now - followTime) / 1000));
+    followTime = now;
+    const step = 8 * pixelScale * dt;
+    const delta = target - currentX;
+    currentX += Math.sign(delta) * Math.min(Math.abs(delta), step);
+    walkAway = null;
+    if (now - lastPaint >= 1000 / 30) {
+      lastPaint = now;
+      canvas.style.transform = `translate3d(${currentX}px,0,0) scaleX(${direction})`;
+      paint('walk', 0);
+    }
+    return true;
+  }
+
   function startInput(kind, event, now) {
     if (laneMotion) return;
+    featherFollowing = false;
     const current = petStarted !== null ? 'pet' : tailStarted !== null ? 'tail-enjoy' : playStarted !== null ? playKind : null;
     stroke = null;
     // Continuing the same gesture never rewinds its animation.
@@ -911,9 +996,9 @@
     pounceHeld = kind === 'pounce';
     chargePointer = pounceHeld ? event.pointerId : null;
     playOrigin = currentX;
-    const bounds = canvas.getBoundingClientRect();
-    const distance = Math.min(70, Math.max(10, (point.x - headRegion.right) * bounds.width / 40));
-    playTarget = Math.max(0, Math.min(travel, currentX + direction * distance));
+    faceFeather(event);
+    const target = featherTarget(event, 0);
+    playTarget = currentX + Math.sign(target - currentX) * Math.min(70, Math.abs(target - currentX));
     featherToy.style.left = `${event.clientX - 22}px`;
     featherToy.style.top = `${event.clientY - 9}px`;
     featherToy.hidden = false;
@@ -939,6 +1024,16 @@
     if (stroke && now - stroke.lastTime < 180 && zone !== stroke.zone &&
         Math.hypot(event.clientX - stroke.x, event.clientY - stroke.y) < 18) zone = stroke.zone;
     showCursor(zone);
+    if (pounceHeld) {
+      faceFeather(event);
+      const target = featherTarget(event, 0);
+      playTarget = playOrigin + Math.sign(target - playOrigin) * Math.min(70, Math.abs(target - playOrigin));
+    } else if (!laneMotion && !reducedMotion.matches && zone === 'front' && !event.buttons &&
+        playStarted === null && petStarted === null && tailStarted === null) {
+      if (!featherFollowing) followTime = now;
+      featherFollowing = true;
+      faceFeather(event);
+    } else if (featherFollowing && zone !== 'front') endFeatherFollow(now);
     if (event.buttons) { stroke = null; return; }
     if (!zone) { stroke = null; return; }
     if (!stroke || stroke.zone !== zone || now - stroke.lastTime > 450 || now - stroke.time > 1200) {
@@ -985,9 +1080,9 @@
   document.addEventListener('pointerup', event => releaseCharge(event));
   document.addEventListener('pointercancel', event => releaseCharge(event, true));
   document.addEventListener('pointerout', event => {
-    if (!event.relatedTarget) { releaseCharge(null, true); cursorPoint = null; clearCursor(); stroke = null; }
+    if (!event.relatedTarget) { endFeatherFollow(performance.now()); releaseCharge(null, true); cursorPoint = null; clearCursor(); stroke = null; }
   });
-  window.addEventListener('blur', () => { releaseCharge(null, true); cursorPoint = null; clearCursor(); });
+  window.addEventListener('blur', () => { endFeatherFollow(performance.now()); releaseCharge(null, true); cursorPoint = null; clearCursor(); });
 
   pet.addEventListener('catpreviewstart', activate);
   pet.addEventListener('catpreviewend', () => {

@@ -135,7 +135,7 @@ const petButton = petCard.querySelector('.pet-toggle');
 let catPinned = true;
 let catHovered = false;
 let catPreviewSuppressed = false;
-let catClosedOnPress = false;
+let catHandledPointerClick = false;
 let catFocused = false;
 let catPointer = null;
 let catInteracting = false;
@@ -144,14 +144,15 @@ let activeCatControl = null;
 const isCatControl = control => control === petButton;
 const catControl = () => activeCatControl || petButton;
 function updateCatInteraction() {
-  const preview = !catPreviewSuppressed && (compactProfile.matches ? catHovered || catFocused || catPointer !== null : catHovered);
+  const preview = !catPreviewSuppressed && (catHovered || catPointer !== null || (compactProfile.matches && catFocused));
   const active = preview || catPinned;
   petCard.dataset.open = String(preview);
   petCard.dataset.pinned = String(catPinned);
   petButton.setAttribute('aria-pressed', String(catPinned));
+  petButton.setAttribute('data-pressing', String(catPointer !== null));
   petButton.setAttribute('aria-expanded', String(preview));
   petCard.dataset.interacting = String(active);
-  petCard.dataset.dismissed = String(catPreviewSuppressed);
+  petCard.dataset.dismissed = String(catPreviewSuppressed && !catPinned);
   if (preview !== previousCatPreview) {
     previousCatPreview = preview;
     petCard.dispatchEvent(new Event(preview ? 'catlaneraise' : 'catlanelower'));
@@ -170,9 +171,9 @@ function closeCatInteraction() {
   updateCatInteraction();
 }
 petButton.addEventListener('click', event => {
-  if (catClosedOnPress) { catClosedOnPress = false; if (event.detail !== 0) return; }
+  if (catHandledPointerClick) { catHandledPointerClick = false; if (event.detail !== 0) return; }
   catPinned = !catPinned;
-  catPreviewSuppressed = !catPinned;
+  catPreviewSuppressed = true;
   updateCatInteraction();
   if (catPinned) petCard.dispatchEvent(new Event('catpreviewstart'));
 });
@@ -193,12 +194,9 @@ for (const control of [petButton]) {
     activeCatControl = control;
     catPointer = event.pointerId;
     catFocused = false;
-    catClosedOnPress = catPinned;
-    if (catPinned) {
-      // Close on press, and ignore hover until the pointer leaves or the user reopens.
-      catPinned = false;
-      catPreviewSuppressed = true;
-    }
+    // Pressing previews and highlights; only release commits the toggle.
+    catHandledPointerClick = false;
+    catPreviewSuppressed = false;
     updateCatInteraction();
   });
   control.addEventListener('focus', () => {
@@ -211,13 +209,16 @@ for (const control of [petButton]) {
 }
 document.addEventListener('pointerup', event => {
   if (event.pointerId !== catPointer) return;
+  catPinned = !catPinned;
+  catHandledPointerClick = true;
+  catPreviewSuppressed = true;
   catPointer = null;
   catFocused = false;
   if (event.pointerType !== 'mouse') catHovered = false;
   updateCatInteraction();
 }, true);
 document.addEventListener('pointercancel', event => {
-  catClosedOnPress = false;
+  catHandledPointerClick = false;
   if (event.pointerId === catPointer) closeCatInteraction();
 }, true);
 document.addEventListener('pointermove', event => {
