@@ -223,7 +223,7 @@
     rect(18, 13 + bob - rise(19), 2, 3, color.stripe);
   }
 
-  function head(dx = 0, dy = -2, expression = 'normal', mouth = 0, tilt = 0) {
+  function head(dx = 0, dy = -1, expression = 'normal', mouth = 0, tilt = 0) {
     const turn = ([x, y]) => [25 + (x - 25) * Math.cos(tilt) - (y - 22) * Math.sin(tilt),
       22 + (x - 25) * Math.sin(tilt) + (y - 22) * Math.cos(tilt)];
     const shift = points => points.map(([x, y]) => turn([x + dx, y + dy]));
@@ -313,10 +313,10 @@
     const phase=distance/(4/.65)*Math.PI*2;
     tail(0,Math.round(Math.sin(phase)*.5));
     groundLeg([11,20],gaitFoot(11,distance,.5),true,4);
-    frontLeg([23,19],gaitFoot(23,distance,.75),true);
+    frontLeg([23,20],gaitFoot(23,distance,.75),true);
     body();
     groundLeg([13,20],gaitFoot(13,distance,0),false,4);
-    frontLeg([28,19],gaitFoot(28,distance,.25));
+    frontLeg([28,20],gaitFoot(28,distance,.25));
     head();
     polygon([[24,20],[28,20],[29,21],[28,22],[26,23],[24,22]],color.orange);
     polygon([[25,20],[28,20],[28,21],[26,22],[25,21]],color.cream);
@@ -470,11 +470,11 @@
     const feet=pose.feet.map((foot,i)=>mixPoint(walking[i],foot,blend));
     tail(lift-arch*.4,Math.sin(phase*Math.PI*2)*.5);
     groundLeg([11,20+lift-arch],feet[0],true,4);
-    frontLeg([23,19+lift],feet[1],true);
+    frontLeg([23,20+lift],feet[1],true);
     body(lift,arch);
     groundLeg([13,20+lift-arch*.65],feet[2],false,4);
-    frontLeg([28,19+lift],feet[3]);
-    head(-arch*.35,-2+lift*.7);
+    frontLeg([28,20+lift],feet[3]);
+    head(-arch*.35,-1+lift*.7);
     polygon([[24,20],[28,20],[29,21],[28,22],[26,23],[24,22]].map(([x,y])=>[x,y+lift]),color.orange);
     polygon([[25,20],[28,20],[28,21],[26,22],[25,21]].map(([x,y])=>[x,y+lift]),color.cream);
   }
