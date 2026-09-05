@@ -133,6 +133,12 @@ const petCard = document.querySelector('.pet-card');
 const compactProfile = window.matchMedia('(width < 1100px)');
 const petButton = petCard.querySelector('.pet-toggle');
 const petPhoto = petCard.querySelector('.pet-photo');
+const floatingPortrait = petCard.querySelector('.pet-portrait').cloneNode(true);
+floatingPortrait.removeAttribute('id');
+floatingPortrait.classList.add('pet-floating-portrait');
+floatingPortrait.setAttribute('aria-hidden', 'true');
+document.body.append(floatingPortrait);
+let catPinned = false;
 let catHovered = false;
 let catFocused = false;
 let catPointer = null;
@@ -141,9 +147,13 @@ let activeCatControl = null;
 const isCatControl = control => control === petButton || (!compactProfile.matches && control === petPhoto);
 const catControl = () => activeCatControl || petButton;
 function updateCatInteraction() {
-  const active = catHovered || catFocused || catPointer !== null;
-  petCard.dataset.open = String(active && compactProfile.matches);
-  if (compactProfile.matches) petButton.setAttribute('aria-expanded', String(active));
+  const preview = catHovered || catFocused || catPointer !== null;
+  const active = preview || catPinned;
+  petCard.dataset.open = String(preview && compactProfile.matches);
+  floatingPortrait.dataset.open = String(preview && !compactProfile.matches);
+  petCard.dataset.pinned = String(catPinned);
+  petButton.setAttribute('aria-pressed', String(catPinned));
+  if (compactProfile.matches) petButton.setAttribute('aria-expanded', String(preview));
   else petButton.removeAttribute('aria-expanded');
   petCard.dataset.interacting = String(active);
   if (active === catInteracting) return;
@@ -159,6 +169,11 @@ function closeCatInteraction() {
   activeCatControl = null;
   updateCatInteraction();
 }
+petButton.addEventListener('click', () => {
+  catPinned = !catPinned;
+  updateCatInteraction();
+  if (catPinned) petCard.dispatchEvent(new Event('catpreviewstart'));
+});
 for (const control of [petButton, petPhoto]) {
   control.addEventListener('pointerenter', event => {
     if (!isCatControl(control) || event.pointerType !== 'mouse') return;
@@ -204,7 +219,7 @@ document.addEventListener('pointerdown', event => {
   if (!petCard.contains(event.target) && !petButton.contains(event.target)) closeCatInteraction();
 });
 document.addEventListener('keydown', event => {
-  if (event.key === 'Escape') closeCatInteraction();
+  if (event.key === 'Escape') { catPinned = false; closeCatInteraction(); }
 });
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) closeCatInteraction();

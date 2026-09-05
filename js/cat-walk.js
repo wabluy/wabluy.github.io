@@ -22,6 +22,7 @@
   let travel = 0;
   let sequence = [];
   let totalDuration = 0;
+  let direction = 1;
 
   function rect(x, y, width, height, ink) {
     ctx.fillStyle = ink;
@@ -213,8 +214,14 @@
     if (!active) return;
     if (document.hidden || !stage.isConnected || !pet.isConnected) { stop(); return; }
     // A frame timestamp can precede activation within the same rendering frame.
-    const elapsed = Math.max(0, now - startedAt);
-    if (elapsed >= totalDuration) { stop(); return; }
+    let elapsed = Math.max(0, now - startedAt);
+    if (elapsed >= totalDuration) {
+      if (pet.dataset.pinned !== 'true') { stop(); return; }
+      direction *= -1;
+      buildSequence();
+      startedAt = now;
+      elapsed = 0;
+    }
     if (now - lastPaint >= 1000 / 24) {
       lastPaint = now;
       let phaseTime = elapsed;
@@ -225,8 +232,9 @@
         phaseTime -= phase.duration;
       }
       const progress = Math.min(1, phaseTime / phase.duration);
-      const position = phase.from + (phase.to - phase.from) * progress;
-      canvas.style.transform = `translate3d(${Math.round(travel * position)}px,0,0)`;
+      const along = phase.from + (phase.to - phase.from) * progress;
+      const position = direction === 1 ? along : 1 - along;
+      canvas.style.transform = `translate3d(${Math.round(travel * position)}px,0,0) scaleX(${direction})`;
       paint(phase.kind, Math.floor(phaseTime / (phase.frameMs || 110)), progress);
     }
     frameRequest = requestAnimationFrame(tick);
@@ -242,9 +250,17 @@
     paint('walk', 0);
     if (reducedMotion.matches) {
       canvas.style.transform = `translate3d(${Math.round(travel * .15)}px,0,0)`;
-      stillTimer = setTimeout(stop, 1500);
+      stillTimer = setTimeout(() => { if (pet.dataset.pinned !== 'true') stop(); }, 1500);
       return;
     }
+    direction = 1;
+    buildSequence();
+    startedAt = performance.now();
+    lastPaint = -Infinity;
+    frameRequest = requestAnimationFrame(tick);
+  }
+
+  function buildSequence() {
     // Choose once per appearance so movement stays smooth between random pauses.
     const between = (min, max) => min + Math.random() * (max - min);
     const stopCount = 1 + Math.floor(Math.random() * 3);
@@ -272,17 +288,20 @@
     walkTo(1);
     sequence.push({ kind: 'idle', duration: 250, from: 1, to: 1 });
     totalDuration = sequence.reduce((sum, phase) => sum + phase.duration, 0);
-    startedAt = performance.now();
-    lastPaint = -Infinity;
-    frameRequest = requestAnimationFrame(tick);
   }
 
   pet.addEventListener('catpreviewstart', activate);
   pet.addEventListener('catpreviewend', stop);
   if (pet.dataset.interacting === 'true') activate();
-  document.addEventListener('visibilitychange', () => { if (document.hidden) stop(); });
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) stop();
+    else if (pet.dataset.interacting === 'true') activate();
+  });
   window.addEventListener('pagehide', stop);
-  reducedMotion.addEventListener('change', stop);
+  reducedMotion.addEventListener('change', () => {
+    stop();
+    if (pet.dataset.interacting === 'true') activate();
+  });
   if ('ResizeObserver' in window) {
     new ResizeObserver(() => {
       if (!active) return;
@@ -294,7 +313,8 @@
   }
   if ('IntersectionObserver' in window) {
     new IntersectionObserver(entries => {
-      if (active && !entries[0].isIntersecting) stop();
+      if (!entries[0].isIntersecting) stop();
+      else if (pet.dataset.interacting === 'true') activate();
     }).observe(stage);
   }
 })();
