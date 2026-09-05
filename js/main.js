@@ -246,8 +246,54 @@ createHoverPreview(
   window.matchMedia('(max-width: 600px)')
 );
 const backgroundDetails = document.querySelector('.background-details');
+const backgroundSummary = backgroundDetails.querySelector('summary');
+const backgroundReducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
+let backgroundAnimation = null;
+let backgroundExpanded = !compactProfile.matches;
 function updateBackgroundVisibility() {
-  backgroundDetails.open = !phoneLayout.matches;
+  if (backgroundAnimation) { backgroundAnimation.onfinish = null; backgroundAnimation.cancel(); backgroundAnimation = null; }
+  backgroundExpanded = !compactProfile.matches;
+  backgroundDetails.open = backgroundExpanded;
+  backgroundDetails.dataset.expanded = String(backgroundExpanded);
+  backgroundDetails.style.removeProperty('height');
+  backgroundDetails.style.removeProperty('overflow');
 }
-phoneLayout.addEventListener('change', updateBackgroundVisibility);
+function animateBackground(expanded) {
+  const from = backgroundDetails.getBoundingClientRect().height;
+  if (backgroundAnimation) { backgroundAnimation.onfinish = null; backgroundAnimation.cancel(); }
+  backgroundExpanded = expanded;
+  backgroundDetails.dataset.expanded = String(expanded);
+  backgroundDetails.style.removeProperty('height');
+  backgroundDetails.open = expanded;
+  const to = backgroundDetails.getBoundingClientRect().height;
+  if (backgroundReducedMotion.matches || Math.abs(from - to) < 1) {
+    backgroundDetails.style.removeProperty('overflow');
+    backgroundAnimation = null;
+    return;
+  }
+  // Keep the content available while height animates, including during collapse.
+  backgroundDetails.open = true;
+  backgroundDetails.style.height = `${from}px`;
+  backgroundDetails.style.overflow = 'hidden';
+  const duration = expanded ? 620 : 420;
+  backgroundDetails.dispatchEvent(new CustomEvent('backgroundmotionstart', {detail:{from,to,duration,expanded}}));
+  const animation = backgroundDetails.animate([{height:`${from}px`},{height:`${to}px`}], {
+    duration, easing:'cubic-bezier(.22,.7,.2,1)', fill:'forwards'
+  });
+  backgroundAnimation = animation;
+  animation.onfinish = () => {
+    if (backgroundAnimation !== animation) return;
+    backgroundDetails.open = expanded;
+    backgroundDetails.style.removeProperty('height');
+    backgroundDetails.style.removeProperty('overflow');
+    backgroundAnimation = null;
+    animation.cancel();
+  };
+}
+backgroundSummary.addEventListener('click', event => {
+  if (!compactProfile.matches) return;
+  event.preventDefault();
+  animateBackground(!backgroundExpanded);
+});
+compactProfile.addEventListener('change', updateBackgroundVisibility);
 updateBackgroundVisibility();

@@ -44,6 +44,8 @@
   let laneMotion = null;
   let laneOffset = 0;
   let catLift = 0;
+  let pendingLandingGroom = false;
+  let pendingCompactTension = false;
   const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
   let active = false;
   let frameRequest = 0;
@@ -79,7 +81,7 @@
   let currentX = 0;
   let direction = 1;
   let turnMotion = null;
-  const turnDuration = 460;
+  const turnDuration = 240;
 
   function rect(x, y, width, height, ink) {
     ctx.fillStyle = ink;
@@ -486,7 +488,7 @@
     if (walkAway) walkAway.start += dt;
     followTime = now;
     turn.progress = Math.min(1, Math.max(0, (now - turn.start) / turnDuration));
-    if (now - lastPaint >= 1000 / 30) { lastPaint = now; paint('turn', 0, turn.progress); }
+    if (now - lastPaint >= 1000 / 60) { lastPaint = now; paint('turn', 0, turn.progress); }
     if (turn.progress >= 1) {
       const next = turn.next;
       turnMotion = null;
@@ -713,6 +715,30 @@
     lastPaint = -Infinity;
   }
 
+  function beginBackgroundMotion(event) {
+    if (desktopLane.matches || reducedMotion.matches) return;
+    const {from,to,duration,expanded} = event.detail;
+    if (!active && pet.dataset.interacting !== 'true') return;
+    pendingLandingGroom = expanded;
+    pendingCompactTension = !expanded;
+    if (!active) return;
+    const line = stage.getBoundingClientRect().bottom;
+    laneMotion = { kind: 'background', start: performance.now(), duration, expanded,
+      catFrom: line - catLift, toLine: line + to - from, scroll: window.scrollY || 0 };
+    laneOffset = 0;
+    if (!expanded) catLift = 0;
+    turnMotion = null;
+    playStarted = petStarted = tailStarted = null;
+    pendingInput = walkAway = null;
+    pounceHeld = false;
+    chargePointer = null;
+    featherFollowing = false;
+    stroke = null;
+    clearCursor();
+    stage.dataset.lane = expanded ? 'falling' : 'rising';
+    lastPaint = -Infinity;
+  }
+
   function tickLane(now) {
     if (!laneMotion) return false;
     const motion = laneMotion;
@@ -720,7 +746,35 @@
     const clamp = t => Math.max(0, Math.min(1, t));
     const smooth = t => t * t * (3 - 2 * t);
     let pose = 'scared', progress = 1, frame = Math.floor(elapsed / 80);
-    if (motion.kind === 'rising') {
+    if (motion.kind === 'background') {
+      const t = clamp((elapsed - (motion.expanded ? 70 : 0)) / Math.max(1,motion.duration - (motion.expanded ? 70 : 0)));
+      const descent = motion.expanded ? t * t : smooth(t);
+      const scroll = (window.scrollY || 0) - motion.scroll;
+      const catLine = motion.catFrom + (motion.toLine - motion.catFrom) * descent - scroll;
+      // Closing lifts the cat with its platform: paws never lag below the line.
+      catLift = motion.expanded ? stage.getBoundingClientRect().bottom - catLine : 0;
+      pose = motion.expanded && elapsed > 70 ? 'falling' : 'scared';
+      if (elapsed >= motion.duration) {
+        catLift = 0;
+        if (motion.expanded) {
+          laneMotion = { kind: 'landing', start: now }; stage.dataset.lane = 'landing'; pose = 'scared';
+        } else {
+          laneMotion = {kind:'compact-settle',start:now};
+          stage.dataset.lane = 'settling';
+        }
+      }
+    } else if (motion.kind === 'compact-settle') {
+      laneOffset = catLift = 0;
+      pose = 'scared';
+      progress = 1 - smooth(clamp((elapsed - 1700) / 300));
+      if (elapsed >= 2000) {
+        pendingCompactTension = false;
+        resetLane();
+        if (pet.dataset.interacting !== 'true') { stop(); return true; }
+        beginWalkAway(now);
+        return false;
+      }
+    } else if (motion.kind === 'rising') {
       const t = smooth(clamp(elapsed / 600));
       laneOffset = motion.from + (motion.target - motion.from) * t;
       catLift = motion.catFrom + (motion.target - motion.catFrom) * t;
@@ -747,6 +801,7 @@
       // A few reassuring licks always precede the return to random activity.
       frame = Math.floor(elapsed / 75);
       if (elapsed >= 2400) {
+        pendingLandingGroom = false;
         resetLane();
         if (pet.dataset.interacting !== 'true') { stop(); return true; }
         beginWalkAway(now);
@@ -763,6 +818,7 @@
   }
 
   function stop() {
+    if (pet.dataset.dismissed === 'true') pendingLandingGroom = pendingCompactTension = false;
     turnMotion = null;
     resetLane();
     active = false;
@@ -915,6 +971,13 @@
     direction = 1;
     currentX = lastGaitX = gaitDistance = 0;
     paint('walk', 0);
+    if (pendingLandingGroom && !desktopLane.matches && !reducedMotion.matches) {
+      laneMotion = {kind:'grooming',start:performance.now(),variant:Math.random()<.65?'groom':'belly-groom'};
+      stage.dataset.lane = 'grooming';
+    } else if (pendingCompactTension && !desktopLane.matches && !reducedMotion.matches) {
+      laneMotion = {kind:'compact-settle',start:performance.now()};
+      stage.dataset.lane = 'settling';
+    }
     if (reducedMotion.matches) {
       canvas.style.transform = `translate3d(${Math.round(travel * .15)}px,0,0)`;
       stillTimer = setTimeout(() => { if (pet.dataset.pinned !== 'true') stop(); }, 1500);
@@ -980,6 +1043,12 @@
     if (((point.x > headRegion.right && point.x < headRegion.right + 66) || (point.x < 0 && point.x > -66)) &&
         point.y >= headRegion.top - 12 && point.y <= headRegion.bottom + 12) return 'front';
     return null;
+  }
+
+  function featherWithinReach(event) {
+    const bounds = canvas.getBoundingClientRect();
+    const gap = Math.max(bounds.left - event.clientX, event.clientX - (bounds.left + bounds.width), 0);
+    return gap <= pixelScale * 14;
   }
 
   function showCursor(zone) {
@@ -1129,6 +1198,7 @@
       faceFeather(event);
     } else if (featherFollowing && zone !== 'front') endFeatherFollow(now);
     if (event.buttons) { stroke = null; return; }
+    if (zone === 'front' && !featherWithinReach(event)) { stroke = null; return; }
     if (!zone) { stroke = null; return; }
     if (!stroke || stroke.zone !== zone || now - stroke.lastTime > 450 || now - stroke.time > 1200) {
       stroke = { zone, x: event.clientX, y: event.clientY, vector: null, turns: 0, travel: 0, time: now, lastTime: now };
@@ -1178,6 +1248,7 @@
   });
   window.addEventListener('blur', () => { endFeatherFollow(performance.now()); releaseCharge(null, true); cursorPoint = null; clearCursor(); });
 
+  document.querySelector('.background-details')?.addEventListener('backgroundmotionstart', beginBackgroundMotion);
   pet.addEventListener('catpreviewstart', activate);
   pet.addEventListener('catpreviewend', () => {
     if (pet.dataset.dismissed === 'true' || !laneMotion) stop();

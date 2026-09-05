@@ -166,6 +166,10 @@ footer { display: flex; align-items: center; justify-content: flex-end; gap: 16p
 }
 @media (width < 1100px) {
   :root { --topbar-height: 60px; }
+  .content > .about { margin-bottom: 56px; }
+  .background-details > summary { display: flex; }
+  .background-details > p { margin-top: 12px; }
+  .background-details[data-expanded='false'] > summary > span[aria-hidden='true'] { transform: none; }
   .header-actions > .pet-card { display: block; }
   .pet-portrait { border: 0; background: transparent; box-shadow: none; }
   .pet-portrait .pet-photo { border: 0; }
