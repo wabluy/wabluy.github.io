@@ -54,6 +54,8 @@
   let totalDuration = 0;
   let playStarted = null;
   let pendingInput = null;
+  let pounceHeld = false;
+  let chargePointer = null;
   const timing = { pet: 1500, tail: 1800, grab: 1200, pounce: 1300 };
   const pounceTiming = { takeoff: .48, landing: .86 };
   let playKind = 'pounce';
@@ -202,9 +204,13 @@
     box(30 + dx, 19 + dy, 1, 1, `${color.orange}55`);
     box(29 + dx, 20 + dy, 1, 1, `${color.orange}44`);
     if (expression === 'normal' || expression === 'aim') {
-      const pupil = expression === 'aim' && mouth > .35 ? 4 : 3;
+      const pupil = expression === 'aim' && mouth > .35 ? 5 : 3;
       for (const eyeX of [25, 34]) {
-        box(eyeX + dx, 13 + dy - (pupil === 4 ? 1 : 0), pupil, pupil, color.eye);
+        if (pupil === 5) {
+          // Rounded pixel pupil: narrow top/bottom rows and fuller middle rows.
+          box(eyeX + dx, 12 + dy, 3, 5, color.eye);
+          box(eyeX - 1 + dx, 13 + dy, 5, 3, color.eye);
+        } else box(eyeX + dx, 13 + dy, 3, 3, color.eye);
         box(eyeX + dx, 13 + dy, 1, 1, color.cream);
       }
       box(31 + dx, 19 + dy, 1, 1, color.outline);
@@ -396,8 +402,10 @@
       wiggle: progress < pounceTiming.takeoff ? Math.sin(prep * Math.PI * 5) * Math.sin(prep * Math.PI) : 0 };
   }
 
-  function drawPounce(progress) {
-    const { prep, flight, crouch, wiggle } = pouncePose(progress);
+  function drawPounce(progress, frame = 0) {
+    const pose = pouncePose(progress);
+    const { prep, flight, crouch } = pose;
+    const wiggle = pounceHeld ? Math.sin(frame * .36) * Math.min(1, prep * 3) : pose.wiggle;
     const aiming = progress < pounceTiming.takeoff;
     const reach = Math.sin(flight * Math.PI);
     const hip = aiming ? wiggle * .8 : 0;
@@ -480,7 +488,7 @@
     tailRoot = { x: 11, y: 21 };
     stage.dataset.action = kind;
     if (kind === 'grab') drawPlay(frame, progress);
-    else if (kind === 'pounce') drawPounce(progress);
+    else if (kind === 'pounce') drawPounce(progress, frame);
     else if (kind === 'tail-enjoy') drawTailEnjoy(progress);
     else if (kind === 'pet') drawPet(progress);
     else if (kind === 'play') drawPlay(frame, progress);
@@ -509,6 +517,8 @@
     treat.hidden = true;
     playStarted = petStarted = tailStarted = null;
     pendingInput = null;
+    pounceHeld = false;
+    chargePointer = null;
     walkAway = null;
     cursorPoint = null;
     clearCursor();
@@ -525,7 +535,7 @@
   function tick(now) {
     if (!active) return;
     if (document.hidden || !stage.isConnected || !pet.isConnected) { stop(); return; }
-    if (pendingInput && playStarted !== null && playKind === 'pounce' && now - playStarted >= timing.pounce * pounceTiming.landing) {
+    if (pendingInput && !pounceHeld && playStarted !== null && playKind === 'pounce' && now - playStarted >= timing.pounce * pounceTiming.landing) {
       const input = pendingInput;
       pendingInput = null;
       currentX = playTarget;
@@ -585,7 +595,8 @@
       return;
     }
     if (playStarted !== null) {
-      const playElapsed = Math.max(0, now - playStarted);
+      const rawElapsed = Math.max(0, now - playStarted);
+      const playElapsed = pounceHeld ? Math.min(rawElapsed, timing.pounce * (pounceTiming.takeoff - .001)) : rawElapsed;
       const duration = timing[playKind];
       if (playElapsed < duration) {
         if (now - lastPaint >= 1000 / 30) {
@@ -599,7 +610,7 @@
           const jump = playKind === 'pounce' ? Math.sin(pose.flight * Math.PI) * 10 : 0;
           canvas.style.transform = `translate3d(${currentX}px,${-jump}px,0) scaleX(${direction})`;
           treat.hidden = true;
-          paint(playKind, Math.floor(playElapsed / 80), progress);
+          paint(playKind, Math.floor(rawElapsed / 80), progress);
         }
         frameRequest = requestAnimationFrame(tick);
         return;
@@ -732,7 +743,7 @@
     stroke = null;
     // Continuing the same gesture never rewinds its animation.
     if (current === kind) return;
-    if (playStarted !== null && playKind === 'pounce' && now - playStarted >= timing.pounce * pounceTiming.takeoff &&
+    if (!pounceHeld && playStarted !== null && playKind === 'pounce' && now - playStarted >= timing.pounce * pounceTiming.takeoff &&
         now - playStarted < timing.pounce * pounceTiming.landing) {
       // Finish the short airborne part before changing pose; keep only the latest intent.
       pendingInput = { kind, event: { clientX: event.clientX, clientY: event.clientY } };
@@ -740,6 +751,8 @@
       return;
     }
     pendingInput = null;
+    pounceHeld = false;
+    chargePointer = null;
     playStarted = petStarted = tailStarted = null;
     walkAway = null;
     clearTimeout(petTimer);
@@ -770,6 +783,8 @@
   function beginFeatherPlay(kind, event, point, now) {
     stroke = null;
     playKind = kind;
+    pounceHeld = kind === 'pounce';
+    chargePointer = pounceHeld ? event.pointerId : null;
     playOrigin = currentX;
     const bounds = canvas.getBoundingClientRect();
     const distance = Math.min(70, Math.max(10, (point.x - headRegion.right) * bounds.width / 40));
@@ -827,10 +842,27 @@
     if (!point || cursorZone(point) !== 'front') return;
     startInput('pounce', event, performance.now());
   });
+  function releaseCharge(event, cancelled = false) {
+    if (!pounceHeld || (event && event.pointerId !== chargePointer)) return;
+    pounceHeld = false;
+    chargePointer = null;
+    const now = performance.now();
+    if (cancelled) {
+      playStarted = null;
+      pendingInput = null;
+      if (active) beginWalkAway(now);
+    } else {
+      // The user controls takeoff, even after a long hold or a quick tap.
+      playStarted = now - timing.pounce * pounceTiming.takeoff;
+      lastPaint = -Infinity;
+    }
+  }
+  document.addEventListener('pointerup', event => releaseCharge(event));
+  document.addEventListener('pointercancel', event => releaseCharge(event, true));
   document.addEventListener('pointerout', event => {
-    if (!event.relatedTarget) { cursorPoint = null; clearCursor(); stroke = null; }
+    if (!event.relatedTarget) { releaseCharge(null, true); cursorPoint = null; clearCursor(); stroke = null; }
   });
-  window.addEventListener('blur', () => { cursorPoint = null; clearCursor(); });
+  window.addEventListener('blur', () => { releaseCharge(null, true); cursorPoint = null; clearCursor(); });
 
   pet.addEventListener('catpreviewstart', activate);
   pet.addEventListener('catpreviewend', stop);
