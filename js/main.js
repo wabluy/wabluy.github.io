@@ -132,7 +132,7 @@ function createHoverPreview(root, trigger, media) {
 const petCard = document.querySelector('.pet-card');
 const compactProfile = window.matchMedia('(width < 1100px)');
 const petButton = petCard.querySelector('.pet-toggle');
-let catPinned = false;
+let catPinned = true;
 let catHovered = false;
 let catFocused = false;
 let catPointer = null;
