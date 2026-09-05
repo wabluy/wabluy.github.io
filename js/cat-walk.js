@@ -356,6 +356,25 @@
     groundLeg([18 + scoot, 23], foot, false, 4.5);
   }
 
+  function drawStretch(frame, progress) {
+    const stretch=poseLevel(progress);
+    // A slow play-bow: planted hind paws, rounded raised hips and reaching forepaws.
+    poseTail([[12,18],[7,16],[5,12],[6,8],[8,7]],stretch);
+    groundLeg(mixPoint([11,20],[12,18],stretch),mixPoint(gaitFoot(11,0,.5),[11,26],stretch),true,4.5);
+    frontLeg(mixPoint([23,20],[25,22],stretch),mixPoint(gaitFoot(23,0,.75),[32,26],stretch),true);
+    poseBody([[8,17],[10,13],[14,11],[18,13],[22,17],[26,20],[29,23],[28,26],[23,26],[18,23],[14,21],[10,21],[7,19]],
+      [[9,17],[11,14],[14,12],[17,14],[21,18],[25,21],[28,24],[27,25],[23,25],[18,22],[14,20],[10,20],[8,19]],
+      [[15,19],[20,20],[26,23],[28,25],[22,25],[18,22]],stretch);
+    groundLeg(mixPoint([13,20],[15,18],stretch),mixPoint(gaitFoot(13,0),[15,26],stretch),false,4.5);
+    head(-stretch,-1+3.5*stretch,stretch>.35?'content':'normal');
+    const paw=mixPoint(gaitFoot(28,0,.25),[36,26],stretch);
+    frontLeg(mixPoint([28,20],[28,23],stretch),paw);
+    if(stretch>.65){
+      rect(31,25,4,1,color.light);rect(34,25,5,1,color.cream);
+      rect(35,25,1,1,color.light);rect(37,25,1,1,color.light);
+    }
+  }
+
   function drawGroom(frame, progress, belly = false) {
     const ease = t => { t = Math.max(0, Math.min(1, t)); return t * t * (3 - 2 * t); };
     const settle = poseLevel(progress);
@@ -693,13 +712,14 @@
     else if (kind === 'chase') drawSprint(gaitDistance,gaitBlend);
     else if (kind === 'yawn') drawYawn(progress);
     else if (kind === 'scratch') drawScratch(frame, progress);
+    else if (kind === 'stretch') drawStretch(frame, progress);
     else if (kind === 'groom') drawGroom(frame, progress);
     else if (kind === 'belly-groom') drawGroom(frame, progress, true);
     else if (kind === 'idle') drawWalk(0);
     else if(kind==='walk')drawSprint(gaitDistance,gaitBlend);
     else drawWalk(gaitDistance);
   }
-  const restingActions=new Set(['scratch','groom','belly-groom','sploot','belly','pet','tail-enjoy','grab','pounce','yawn','scared']);
+  const restingActions=new Set(['stretch','scratch','groom','belly-groom','sploot','belly','pet','tail-enjoy','grab','pounce','yawn','scared']);
   function drawExit(source,progress) {
     actionWeight=(source.exitWeight??1)*(1-easePose(progress));
     postureOverride=(easePose(source.progress/.16)*(1-easePose((source.progress-.84)/.16)))*actionWeight;
@@ -1115,9 +1135,9 @@
     }
     for (let i = 0; i < stopCount; i++) {
       walkTo(startPosition + (1 - startPosition) * (i + between(.65, 1.25)) / (stopCount + 1));
-      const choices = ['belly', 'sploot', 'yawn', 'scratch', 'groom', 'belly-groom'].filter(kind => kind !== previousAction);
+      const choices = ['belly', 'sploot', 'yawn', 'scratch', 'stretch', 'groom', 'belly-groom'].filter(kind => kind !== previousAction);
       const kind = choices[Math.floor(Math.random() * choices.length)];
-      const duration = (kind === 'groom' || kind === 'belly-groom') ? between(2400, 3000) : kind === 'belly' ? between(2600, 3400)
+      const duration = kind === 'stretch' ? between(3000, 3500) : (kind === 'groom' || kind === 'belly-groom') ? between(2400, 3000) : kind === 'belly' ? between(2600, 3400)
         : kind === 'sploot' ? between(2100, 3200) : between(1800, 2800);
       sequence.push({ kind, duration, from: position, to: position, frameMs: between(90, 140) });
       previousAction = kind;

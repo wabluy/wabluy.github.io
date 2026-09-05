@@ -55,6 +55,7 @@ function animateSection(section, expanded, animate = true) {
   };
 }
 let showingHomeDefaults = true;
+let navigationRequest = 0;
 function updateNavigation() {
   const active = disclosures.find(section => sectionExpanded(section))?.id || 'about';
   for (const link of navLinks) {
@@ -63,6 +64,7 @@ function updateNavigation() {
   }
 }
 function openSection(target, fromHome = false, animate = true) {
+  navigationRequest++;
   showingHomeDefaults = fromHome;
   for (const section of disclosures) if (section !== target) animateSection(section, false, animate);
   if (target) animateSection(target, true, animate);
@@ -77,7 +79,16 @@ function followHash(hash, scroll = true) {
   }
   const section = target.closest('.section-disclosure');
   openSection(section || defaultSection, !section, scroll);
-  if (scroll) requestAnimationFrame(() => target.scrollIntoView({ block: 'start' }));
+  if (scroll) {
+    const request = navigationRequest;
+    // The destination moves while earlier lists collapse; locate it after layout settles.
+    const pending = disclosures.map(section => sectionMotions.get(section)?.height.finished)
+      .filter(Boolean).map(finished => finished.catch(() => {}));
+    Promise.all(pending).then(() => requestAnimationFrame(() => {
+      if (request !== navigationRequest) return;
+      target.scrollIntoView({ block: 'start', behavior: sectionReducedMotion.matches ? 'auto' : 'smooth' });
+    }));
+  }
 }
 for (const section of disclosures) {
   section.addEventListener('toggle', () => {
@@ -98,6 +109,10 @@ for (const link of [...navLinks, ...document.querySelectorAll('a[href="#top"], .
   });
 }
 window.addEventListener('hashchange', () => followHash(location.hash));
+// A fresh gesture cancels delayed navigation instead of pulling the reader back.
+for (const type of ['wheel', 'touchstart', 'pointerdown', 'keydown']) {
+  window.addEventListener(type, () => { navigationRequest++; }, { passive: true });
+}
 phoneLayout.addEventListener('change', () => {
   if (showingHomeDefaults) followHash(location.hash, false);
 });
