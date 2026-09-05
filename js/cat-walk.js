@@ -408,9 +408,9 @@
     const wiggle = pounceHeld ? Math.sin(frame * .36) * Math.min(1, prep * 3) : pose.wiggle;
     const aiming = progress < pounceTiming.takeoff;
     const reach = Math.sin(flight * Math.PI);
-    const hip = aiming ? wiggle * .8 : 0;
+    const hip = aiming ? wiggle * 1.6 : 0;
     // Fold the short legs under the plump body; paws remain on the ground while aiming.
-    tail(crouch, Math.round(wiggle));
+    tail(crouch, Math.round(wiggle * 1.5));
     groundLeg([14 + hip, 22 + crouch * 2], [14 - 2 * reach, 26 - 2 * reach], true, 4);
     groundLeg([25, 22 + crouch * 2], [26 + 4 * reach, 26 - 2 * reach], true, 4);
     ctx.save();

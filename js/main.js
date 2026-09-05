@@ -134,6 +134,8 @@ const compactProfile = window.matchMedia('(width < 1100px)');
 const petButton = petCard.querySelector('.pet-toggle');
 let catPinned = true;
 let catHovered = false;
+let catPreviewSuppressed = false;
+let catClosedOnPress = false;
 let catFocused = false;
 let catPointer = null;
 let catInteracting = false;
@@ -141,7 +143,7 @@ let activeCatControl = null;
 const isCatControl = control => control === petButton;
 const catControl = () => activeCatControl || petButton;
 function updateCatInteraction() {
-  const preview = compactProfile.matches ? catHovered || catFocused || catPointer !== null : catHovered;
+  const preview = !catPreviewSuppressed && (compactProfile.matches ? catHovered || catFocused || catPointer !== null : catHovered);
   const active = preview || catPinned;
   petCard.dataset.open = String(preview);
   petCard.dataset.pinned = String(catPinned);
@@ -161,8 +163,10 @@ function closeCatInteraction() {
   activeCatControl = null;
   updateCatInteraction();
 }
-petButton.addEventListener('click', () => {
+petButton.addEventListener('click', event => {
+  if (catClosedOnPress) { catClosedOnPress = false; if (event.detail !== 0) return; }
   catPinned = !catPinned;
+  catPreviewSuppressed = !catPinned;
   updateCatInteraction();
   if (catPinned) petCard.dispatchEvent(new Event('catpreviewstart'));
 });
@@ -171,9 +175,11 @@ for (const control of [petButton]) {
     if (!isCatControl(control) || event.pointerType !== 'mouse') return;
     activeCatControl = control;
     catHovered = true;
+    catPreviewSuppressed = false;
     updateCatInteraction();
   });
   control.addEventListener('pointerleave', () => {
+    catPreviewSuppressed = false;
     if (control === catControl()) closeCatInteraction();
   });
   control.addEventListener('pointerdown', event => {
@@ -181,6 +187,12 @@ for (const control of [petButton]) {
     activeCatControl = control;
     catPointer = event.pointerId;
     catFocused = false;
+    catClosedOnPress = catPinned;
+    if (catPinned) {
+      // Close on press, and ignore hover until the pointer leaves or the user reopens.
+      catPinned = false;
+      catPreviewSuppressed = true;
+    }
     updateCatInteraction();
   });
   control.addEventListener('focus', () => {
@@ -199,6 +211,7 @@ document.addEventListener('pointerup', event => {
   updateCatInteraction();
 }, true);
 document.addEventListener('pointercancel', event => {
+  catClosedOnPress = false;
   if (event.pointerId === catPointer) closeCatInteraction();
 }, true);
 document.addEventListener('pointermove', event => {
