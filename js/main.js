@@ -19,42 +19,73 @@ toggle.addEventListener('click', () => {
 const navLinks = [...document.querySelectorAll('nav a')];
 const disclosures = [...document.querySelectorAll('.section-disclosure')];
 const phoneLayout = window.matchMedia('(max-width: 600px)');
+const sectionMotions = new WeakMap();
+const sectionReducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
+// Native exclusive groups would instantly hide the previous section during its collapse.
+for (const section of disclosures) section.removeAttribute('name');
+function sectionExpanded(section) { return sectionMotions.get(section)?.expanded ?? section.open; }
+function animateSection(section, expanded, animate = true) {
+  const previous = sectionMotions.get(section);
+  if (sectionExpanded(section) === expanded && !previous) return;
+  const from = section.getBoundingClientRect().height;
+  if (previous) { previous.height.onfinish = null; previous.height.cancel(); previous.reveal?.cancel(); }
+  const body = section.querySelector('.section-body');
+  body.style.removeProperty('clip-path');
+  section.style.removeProperty('height');
+  section.open = expanded;
+  const to = section.getBoundingClientRect().height;
+  if (!animate || sectionReducedMotion.matches || Math.abs(from-to)<1) {
+    section.style.removeProperty('overflow');sectionMotions.delete(section);return;
+  }
+  section.open = true;
+  section.style.height = `${from}px`;section.style.overflow = 'hidden';
+  const duration = expanded ? 620 : 420;
+  const height = section.animate([{height:`${from}px`},{height:`${to}px`}],
+    {duration,easing:'cubic-bezier(.22,.7,.2,1)',fill:'forwards'});
+  const visible = Math.max(0,from-section.querySelector('summary').getBoundingClientRect().height);
+  const hidden = Math.max(0,100-visible/Math.max(1,body.getBoundingClientRect().height)*100);
+  const reveal = expanded ? body.animate([{clipPath:`inset(0 0 ${hidden}% 0)`},{clipPath:'inset(0 0 0% 0)'}],
+    {duration,easing:'cubic-bezier(.4,0,.7,1)',fill:'forwards'}) : null;
+  const motion = {height,reveal,expanded};sectionMotions.set(section,motion);
+  section.dispatchEvent(new CustomEvent('sectionmotionstart',{bubbles:true,detail:{duration,expanded}}));
+  height.onfinish = () => {
+    if(sectionMotions.get(section)!==motion)return;
+    section.open=expanded;section.style.removeProperty('height');section.style.removeProperty('overflow');
+    height.cancel();reveal?.cancel();sectionMotions.delete(section);updateNavigation();
+  };
+}
 let showingHomeDefaults = true;
 function updateNavigation() {
-  const active = disclosures.find(section => section.open)?.id || 'about';
+  const active = disclosures.find(section => sectionExpanded(section))?.id || 'about';
   for (const link of navLinks) {
     if (link.getAttribute('href') === `#${active}`) link.setAttribute('aria-current', 'location');
     else link.removeAttribute('aria-current');
   }
 }
-function openSection(target, fromHome = false) {
+function openSection(target, fromHome = false, animate = true) {
   showingHomeDefaults = fromHome;
-  for (const section of disclosures) if (section !== target) section.open = false;
-  if (target) target.open = true;
+  for (const section of disclosures) if (section !== target) animateSection(section, false, animate);
+  if (target) animateSection(target, true, animate);
   updateNavigation();
 }
 function followHash(hash, scroll = true) {
   const target = document.getElementById(hash.slice(1) || 'top');
   const defaultSection = phoneLayout.matches ? null : document.getElementById('news');
   if (!target) {
-    openSection(defaultSection, true);
+    openSection(defaultSection, true, scroll);
     return;
   }
   const section = target.closest('.section-disclosure');
-  openSection(section || defaultSection, !section);
+  openSection(section || defaultSection, !section, scroll);
   if (scroll) requestAnimationFrame(() => target.scrollIntoView({ block: 'start' }));
 }
 for (const section of disclosures) {
   section.addEventListener('toggle', () => {
-    if (section.open) {
-      // Also supports browsers without native exclusive <details> groups.
-      for (const other of disclosures) if (other !== section) other.open = false;
-    }
     updateNavigation();
   });
   section.querySelector('summary').addEventListener('click', event => {
     event.preventDefault();
-    openSection(section.open ? null : section);
+    openSection(sectionExpanded(section) ? null : section);
   });
 }
 for (const link of [...navLinks, ...document.querySelectorAll('a[href="#top"], .skip-link')]) {
@@ -336,3 +367,4 @@ backgroundSummary.addEventListener('click', event => {
 });
 compactProfile.addEventListener('change', updateBackgroundVisibility);
 updateBackgroundVisibility();
+

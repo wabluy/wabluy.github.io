@@ -135,7 +135,7 @@
   }
   function showHole(x,y,openness) {
     const w=width();hole.hidden=false;
-    Object.assign(hole.style,{left:`${x-sx()}px`,top:`${y-sy()}px`,width:`${w*.34}px`,height:`${w*.65}px`,transform:`translate(-50%,-100%) scaleX(${Math.max(.001,openness)})`});
+    Object.assign(hole.style,{left:`${x-sx()}px`,top:`${y-sy()}px`,width:`${w*.4}px`,height:`${w*.74}px`,transform:`translate(-50%,-100%) scaleX(${Math.max(.001,openness)})`});
   }
   function tickPortal(now) {
     const r=homeRect();if(!r){cancel();return;}
@@ -203,12 +203,38 @@
     if(state.mode==='parked') {
       const r=currentLine(state.target);
       if(!r||now>=state.deadline){returnHome(now);return true;}
-      setLine(r);return false;
+      setLine(r);
+      if(state.platformMotion) {
+        const motion=state.platformMotion,elapsed=now-motion.start;
+        if(elapsed < motion.duration) {
+          if(Math.abs(r.y-motion.fromY)>1)motion.moved=true;
+          if(motion.moved)api.render(motion.expanded?'falling':'scared',Math.floor(elapsed/80),1,0,state.platformFacing);
+          return true;
+        }
+        delete state.platformMotion;
+        state.deadline=now+10000;
+        if(motion.moved)api.platformLanded(motion.expanded);
+      }
+      return false;
     }
     if(state.mode==='returning'){tickPortal(now);return true;}
     return false;
   }
-  api.install({tick,cancel,isAway:()=>!!state,blocksInput:()=>!!state&&state.mode!=='parked'});
+  api.install({tick,cancel,isAway:()=>!!state,blocksInput:()=>!!state&&(state.mode!=='parked'||!!state.platformMotion)});
+  function followSectionMotion(event) {
+    if(state?.mode!=='parked')return;
+    const source=event.target;
+    // A section's lower separators move; its own top border stays in place.
+    const before=source.getBoundingClientRect(),r=currentLine(state.target);
+    if(!r || r.y < before.bottom+sy()-1)return;
+    const existing=state.platformMotion;
+    state.platformFacing=api.direction();api.pause();
+    state.platformMotion={start:performance.now(),duration:event.detail.duration,
+      expanded:event.detail.expanded,fromY:r.y,moved:existing?.moved||false};
+    state.deadline=performance.now()+event.detail.duration+10000;
+  }
+  document.addEventListener('sectionmotionstart',followSectionMotion);
+  document.querySelector('.background-details')?.addEventListener('backgroundmotionstart',followSectionMotion);
   canvas.style.pointerEvents='auto';canvas.style.touchAction='none';canvas.draggable=false;
   document.addEventListener('selectstart',event=>{if(state&&['arming','dragging'].includes(state.mode))event.preventDefault();},true);
   document.addEventListener('dragstart',event=>{if(state&&['arming','dragging'].includes(state.mode))event.preventDefault();},true);

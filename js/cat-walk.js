@@ -106,7 +106,7 @@
     rect(12,15+4*amount,8,2,color.light);rect(13,13+4*amount,2,3,color.stripe);rect(18,12+4*amount,2,3,color.stripe);
   }
   function poseTail(points,amount) {
-    const resting=[[11,21],[6,20],[3,17],[3,13],[5,11]];
+    const resting=[[11,21],[6,20],[3,17],[3,12],[5,10]];
     const contour=resting.map((point,i)=>mixPoint(point,points[i],amount));
     line(contour,color.outline,5);line(contour,color.orange,3);
     const tip=contour.at(-1);rect(tip[0]-1,tip[1],2,2,color.stripe);
@@ -180,15 +180,28 @@
     const bend = Math.sqrt(Math.max(0, length * length - reach * reach / 4));
     const knee = [(root[0] + end[0]) / 2 - dy / distance * bend,
       (root[1] + end[1]) / 2 + dx / distance * bend];
-    line([mixPoint(root,knee,.5),knee,end],color.outline,3);
+    line([mixPoint(root,knee,.5),knee,end],color.outline,far?2:3);
     line([root,knee,end],far?color.stripe:color.orange,2);
-    rect(end[0] - 1, end[1] - 1, 3, 2, far ? color.light : color.cream);
+    rect(end[0] - 1, end[1] - 1, far ? 2 : 3, 2, far ? color.orange : color.cream);
+  }
+
+  function frontLeg(root, foot, far = false) {
+    // A tapered chest-to-wrist contour keeps the foreleg soft, with a small rounded paw.
+    const rx=root[0],ry=root[1],fx=foot[0],fy=foot[1];
+    const ex=rx+(fx-rx)*.35,ey=ry+(fy-ry)*.5;
+    const half=far?1.2:1.7;
+    polygon([[rx-half,ry-1],[rx+half,ry-1],[ex+1.2,ey],[fx+1,fy-2],
+      [fx+2,fy-1],[fx+2,fy],[fx+1,fy+1],[fx-1,fy+1],[fx-2,fy],
+      [fx-1.2,fy-2],[ex-half,ey]],far?color.stripe:color.outline);
+    polygon([[rx-half+.5,ry-1],[rx+half-.5,ry-1],[ex+.6,ey],[fx+.5,fy-2],
+      [fx+1.5,fy-1],[fx+1,fy],[fx-1,fy],[fx-.6,fy-2],[ex-half+.6,ey]],color.orange);
+    polygon([[fx-1,fy-1],[fx+1,fy-1],[fx+1.5,fy],[fx+1,fy+.6],[fx-1,fy+.6]],far?color.light:color.cream);
   }
 
   function tail(bob, sway = 0, sitting = false) {
     const points = sitting
       ? [[14, 24], [8, 25], [5, 23], [5 + sway, 20]]
-      : [[11, 21 + bob], [6, 20 + bob], [3, 17 + bob], [3, 13 + bob], [5 + sway, 11 + bob]];
+      : [[11, 21 + bob], [6, 20 + bob], [3, 17 + bob], [3, 12 + bob], [5 + sway, 10 + bob]];
     const matrix = ctx.getTransform();
     const [rootX, rootY] = points[0];
     tailRoot = { x: matrix.a * rootX + matrix.c * rootY + matrix.e,
@@ -210,7 +223,7 @@
     rect(18, 13 + bob - rise(19), 2, 3, color.stripe);
   }
 
-  function head(dx = 0, dy = 0, expression = 'normal', mouth = 0, tilt = 0) {
+  function head(dx = 0, dy = -2, expression = 'normal', mouth = 0, tilt = 0) {
     const turn = ([x, y]) => [25 + (x - 25) * Math.cos(tilt) - (y - 22) * Math.sin(tilt),
       22 + (x - 25) * Math.sin(tilt) + (y - 22) * Math.cos(tilt)];
     const shift = points => points.map(([x, y]) => turn([x + dx, y + dy]));
@@ -235,8 +248,7 @@
     box(27 + dx, 9 + dy, 2, 2, color.stripe);
     box(33 + dx, 9 + dy, 2, 2, color.stripe);
     polygon(shift([[30, 9], [31, 11], [32, 13], [34, 15], [37, 17], [38, 19], [35, 22], [25, 22], [22, 20], [22, 17], [26, 15], [28, 13], [29, 11]]), color.cream);
-    box(30 + dx, 17 + dy, 3, 1, color.pink);
-    box(31 + dx, 18 + dy, 1, 1, color.pink);
+    box(31 + dx, 17 + dy, 1, 1, color.pink);
     // A small mouth-side marking fades into the cream fur at its pixel edges.
     box(28 + dx, 18 + dy, 2, 2, `${color.orange}55`);
     box(29 + dx, 18 + dy, 1, 1, `${color.orange}88`);
@@ -281,8 +293,8 @@
     }
     if (!(expression === 'yawn' && mouth > 0)) {
       // Two tiny cheek curves meet beneath the nose in a soft pixel W.
-      inkLine([[29 + dx, 19 + dy], [30 + dx, 20 + dy], [31 + dx, 19 + dy],
-        [32 + dx, 20 + dy], [33 + dx, 19 + dy]], color.outline);
+      inkLine([[29 + dx, 18 + dy], [30 + dx, 19 + dy], [31 + dx, 18 + dy],
+        [32 + dx, 19 + dy], [33 + dx, 18 + dy]], color.outline);
     }
   }
 
@@ -301,11 +313,13 @@
     const phase=distance/(4/.65)*Math.PI*2;
     tail(0,Math.round(Math.sin(phase)*.5));
     groundLeg([11,20],gaitFoot(11,distance,.5),true,4);
-    groundLeg([24,20],gaitFoot(24,distance,.75),true,4);
+    frontLeg([23,19],gaitFoot(23,distance,.75),true);
     body();
     groundLeg([13,20],gaitFoot(13,distance,0),false,4);
-    groundLeg([27,20],gaitFoot(27,distance,.25),false,4);
+    frontLeg([28,19],gaitFoot(28,distance,.25));
     head();
+    polygon([[24,20],[28,20],[29,21],[28,22],[26,23],[24,22]],color.orange);
+    polygon([[25,20],[28,20],[28,21],[26,22],[25,21]],color.cream);
   }
 
   function drawYawn(progress) {
@@ -316,7 +330,7 @@
     groundLeg([25, 22], [29, 26], true, 4);
     body(0);
     groundLeg([16, 22], [15, 26]);
-    groundLeg([27, 22], [31 + Math.round(open), 26], false, 4);
+    groundLeg([30, 22], [31 + Math.round(open), 26], false, 4);
     // A small upward head tilt, rather than a downward lunge, follows the yawn.
     head(0, 1, 'yawn', mouth, -open * Math.PI / 15);
   }
@@ -331,7 +345,7 @@
     poseBody(shift([[10,22],[12,17],[17,14],[22,14],[25,18],[26,23],[23,26],[13,26]]),
       shift([[11,22],[13,18],[17,15],[21,15],[24,18],[25,22],[22,25],[13,25]]),
       [[14,20],[21,20],[25,18],[27,19],[25,21],[20,22],[18,22],[18,23],[15,23],[14,22],[12,21]],reach);
-    groundLeg([27, 22], [27, 26]);
+    frontLeg([29, 19], [29, 26]);
     head(0,0,reach>.3?'content':'normal');
     const rub = reach > .95 ? Math.round(Math.sin(frame * Math.PI / 3)) : 0;
     const foot = [19 + 9 * reach, 26 - 4 * reach + rub];
@@ -379,7 +393,7 @@
       [[18,23],[24,23],[26,27],[24,32],[17,32],[14,29],[15,25]],lift);
     groundLeg(mixPoint([16,22],[24,31],lift),mixPoint([16,26],[24,36-curl],lift),false,4);
     head(-6*lift,2*lift,lift>.25?'aim':'normal',lift);
-    groundLeg(mixPoint([27,22],[21,25],lift),mixPoint([27,26],[21,29-curl],lift),false,3);
+    groundLeg(mixPoint([30,22],[21,25],lift),mixPoint([31,26],[21,29-curl],lift),false,3);
     if(lift>.5){rect(19,29-curl,3,1,color.cream);rect(28,29-curl,3,1,color.cream);}
   }
 
@@ -414,8 +428,8 @@
     poseBody([[9,23],[12,18-breath],[23,17-breath],[29,21],[29,26],[11,26]],
       [[10,23],[13,19-breath],[23,18-breath],[28,22],[27,25],[11,25]],
       [[12,24],[24,23],[27,24],[26,25],[13,25]],settle);
-    groundLeg(mixPoint([26,22],[26,23],settle),mixPoint([27,26],[23,26],settle));
-    groundLeg(mixPoint([27,22],[33,23],settle),mixPoint([28,26],[37,26],settle));
+    groundLeg(mixPoint([25,20],[26,23],settle),mixPoint([25,26],[23,26],settle));
+    groundLeg(mixPoint([31,20],[33,23],settle),mixPoint([31,26],[37,26],settle));
     head(-settle,3*settle,settle>.4?'content':'normal');
   }
 
@@ -435,7 +449,7 @@
     ctx.save();ctx.translate(30,15);ctx.rotate(-Math.PI*roll);ctx.translate(-30,-15);
     head(0,0,roll>.3?'content':'normal');ctx.restore();
     paw([12,24],[12,22],[14,20-curl],[16,22],[16,26],false);
-    paw([23,24],[21,22],[21,20+curl],[27,22],[27,26],false);
+    paw([23,24],[21,22],[21,20+curl],[30,22],[31,26],false);
   }
 
   function sprintPose(distance) {
@@ -447,20 +461,22 @@
     const lift = compression - air * 1.4;
     const arch = .4 * Math.sin(phase * Math.PI * 2) ** 2;
     const foot = (x, offset) => gaitFoot(x, distance, offset, 4.5, .3, 3.1);
-    return { phase, lift, arch, feet: [foot(11,.5),foot(24,0),foot(13,.43),foot(27,-.07)] };
+    return { phase, lift, arch, feet: [foot(11,.5),foot(23,0),foot(13,.43),foot(28,-.07)] };
   }
 
   function drawSprint(distance,blend=1) {
     const pose=sprintPose(distance),phase=pose.phase,lift=pose.lift*blend,arch=pose.arch*blend;
-    const walking=[gaitFoot(11,distance,.5),gaitFoot(24,distance,.75),gaitFoot(13,distance,0),gaitFoot(27,distance,.25)];
+    const walking=[gaitFoot(11,distance,.5),gaitFoot(23,distance,.75),gaitFoot(13,distance,0),gaitFoot(28,distance,.25)];
     const feet=pose.feet.map((foot,i)=>mixPoint(walking[i],foot,blend));
     tail(lift-arch*.4,Math.sin(phase*Math.PI*2)*.5);
     groundLeg([11,20+lift-arch],feet[0],true,4);
-    groundLeg([24,20+lift],feet[1],true,4);
+    frontLeg([23,19+lift],feet[1],true);
     body(lift,arch);
     groundLeg([13,20+lift-arch*.65],feet[2],false,4);
-    groundLeg([27,20+lift],feet[3],false,4);
-    head(-arch*.35,lift*.7);
+    frontLeg([28,19+lift],feet[3]);
+    head(-arch*.35,-2+lift*.7);
+    polygon([[24,20],[28,20],[29,21],[28,22],[26,23],[24,22]].map(([x,y])=>[x,y+lift]),color.orange);
+    polygon([[25,20],[28,20],[28,21],[26,22],[25,21]].map(([x,y])=>[x,y+lift]),color.cream);
   }
 
   function drawTurn(progress) {
@@ -471,7 +487,7 @@
     const mix = (a, b) => a + (b - a) * bodyTurn;
     const step = Math.sin(half * Math.PI * 2) * 1.5;
     // Pass through a broad front-facing stance instead of flattening or flipping the silhouette.
-    const tailPoints = [[11,21],[6,20],[3,17],[3,13],[5,11]].map(([x,y]) => [mix(x,20),y]);
+    const tailPoints = [[11,21],[6,20],[3,17],[3,12],[5,10]].map(([x,y]) => [mix(x,20),y]);
     line(tailPoints, color.outline, 4);
     line(tailPoints, color.orange, 2);
     groundLeg([mix(14,17),21], [mix(14,18),26 - step], true, 4);
@@ -538,7 +554,7 @@
     tail(0, Math.round(Math.sin(progress * Math.PI * 2)));
     body(0);
     groundLeg([16, 22], [16, 26]);
-    groundLeg([27, 22], [27, 26]);
+    frontLeg([29, 19], [29, 26]);
     head(0,nuzzle,actionWeight>.4?'pet':'normal');
   }
 
@@ -546,8 +562,8 @@
     const ease = t => { t = Math.max(0, Math.min(1, t)); return t * t * (3 - 2 * t); };
     const raised = ease(progress / .28) * (1 - ease((progress - .72) / .28)) * actionWeight;
     const lift = 2 * raised;
-    const resting = [[11,21],[6,20],[3,17],[3,13],[5,11]];
-    const upright = [[11,19],[10,16],[10,12],[10,8],[10,5]];
+    const resting = [[11,21],[6,20],[3,17],[3,12],[5,10]];
+    const upright = [[11,19],[10,16],[10,12],[10,8],[10,4]];
     const points = resting.map(([x,y], i) => [x + (upright[i][0] - x) * raised, y + (upright[i][1] - y) * raised]);
     line(points, color.outline, 5);
     line(points, color.orange, 3);
@@ -559,7 +575,7 @@
     groundLeg([25, 22], [25, 26], true);
     body(0, lift);
     groundLeg([16, 22 - lift * .67], [15, 26]);
-    groundLeg([27, 22], [28, 26]);
+    frontLeg([29, 19], [29, 26]);
     head(0, Math.round(raised), 'pet');
   }
 
@@ -593,7 +609,7 @@
     body();
     ctx.restore();
     groundLeg([16 + hip, 22 + crouch * 2], [16 - 3 * reach, 26 - 2 * reach], false, 4);
-    groundLeg([27, 22 + crouch * 2], [28 + 5 * reach, 26 - 3 * reach], false, 4);
+    groundLeg([30, 22 + crouch * 2], [31 + 5 * reach, 26 - 3 * reach], false, 4);
     head(0,2*crouch,aiming&&actionWeight>.3?'aim':'normal',prep*actionWeight);
   }
 
@@ -625,7 +641,7 @@
     const angle = n => (90+(from[n]+(to[n]-from[n])*t-90)*actionWeight)*Math.PI/180;
     const foreleg = (far) => {
       // Shoulder attachment follows the same torso transform throughout the rise.
-      const shoulder = [mix(far ? 25 : 27, far ? 24 : 25), mix(22,18)];
+      const shoulder = [mix(far ? 25 : 30, far ? 24 : 25), mix(22,18)];
       const upper = angle(far ? 3 : 1), lower = angle(far ? 4 : 2);
       const reach = mix(2, 2.8);
       const elbow = [shoulder[0] + reach * Math.cos(upper), shoulder[1] + reach * Math.sin(upper)];
@@ -881,10 +897,11 @@
         return false;
       }
     }
+    // Position follows the DOM at display refresh rate; only pixel poses are throttled.
+    stage.style.transform = `translate3d(0,${-laneOffset}px,0)`;
+    canvas.style.transform = `translate3d(${currentX}px,${laneOffset - catLift}px,0) scaleX(${direction})`;
     if (now - lastPaint >= 1000 / 30) {
       lastPaint = now;
-      stage.style.transform = `translate3d(0,${-laneOffset}px,0)`;
-      canvas.style.transform = `translate3d(${currentX}px,${laneOffset - catLift}px,0) scaleX(${direction})`;
       paint(pose, frame, progress);
     }
     return true;
@@ -1370,6 +1387,12 @@
       const r=canvas.getBoundingClientRect(),x=headRegion.left-.5,y=headRegion.top+10;
       const facing=turnMotion && turnMotion.progress<.5 ? turnMotion.from : direction;
       return {x:r.left+(facing===1?x:40-x)*r.width/40,y:r.top+y*r.height/canvas.height};
+    },
+    platformLanded(expanded) {
+      poseHandoff=null;lastPose=null;catLift=laneOffset=0;
+      laneMotion={kind:expanded?'landing':'compact-settle',start:performance.now()};
+      pendingLandingGroom=expanded;pendingCompactTension=!expanded;
+      stage.dataset.lane=expanded?'landing':'settling';lastPaint=-Infinity;
     },
     prepareLift() { liftOrigin=lastPose?{...lastPose}:{kind:'idle',frame:0,progress:0,distance:0}; },
     lift(progress,frame=0) {

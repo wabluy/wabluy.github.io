@@ -87,8 +87,33 @@ html.cat-cursor-scruff, html.cat-cursor-scruff * { cursor: grab !important; }
 .cat-scruff-hint[hidden], .cat-return-hole[hidden] { display: none; }
 .cat-return-hole {
   position: fixed; z-index: 79; border-radius: 50%; pointer-events: none;
-  background: radial-gradient(ellipse at 48% 48%, #080706 48%, #33261d 72%, #805039 85%, #c58049 100%);
-  box-shadow: 0 1px 3px #0005; transform-origin: 50% 100%;
+  isolation: isolate; transform-origin: 50% 100%;
+  border: 1px solid #cbb8ff;
+  background: radial-gradient(circle at 32% 24%, #fff 0 .6px, transparent 1px),
+    radial-gradient(circle at 68% 65%, #e3d9ff 0 .7px, transparent 1.2px),
+    radial-gradient(circle at 43% 78%, #fff 0 .5px, transparent 1px),
+    radial-gradient(ellipse at 60% 42%, #9670e780, transparent 53%),
+    radial-gradient(ellipse at 40% 65%, #4c35ab 0, #21173f 46%, #11132b 64%, #9771dc 83%, #d3b7ff 100%);
+  box-shadow: inset 0 0 6px #be9bff88, 0 0 5px #aa84ef99, 0 0 13px #8861d74d;
+}
+.cat-return-hole::before {
+  content: ''; position: absolute; inset: 3px; border-radius: inherit;
+  background: repeating-conic-gradient(from 15deg, #9f76e000 0deg 48deg, #cbb1ff66 65deg, #7954c744 82deg, #9f76e000 100deg);
+  box-shadow: inset 0 0 5px #17132e;
+  animation: cat-portal-shimmer 1.4s ease-in-out infinite alternate;
+}
+.cat-return-hole::after {
+  content: ''; position: absolute; inset: -4px; border-radius: inherit;
+  border: 1px solid #c5a8fa55;
+  background: radial-gradient(circle at 50% 0, #f3eaff 0 1px, transparent 2px),
+    radial-gradient(circle at 5% 48%, #d7c6ff 0 1px, transparent 2px),
+    radial-gradient(circle at 93% 70%, #eadbff 0 1px, transparent 2px);
+  animation: cat-portal-runes 1.1s ease-in-out infinite alternate;
+}
+@keyframes cat-portal-shimmer { from { opacity: .55; transform: scale(.85); } to { opacity: 1; transform: scale(1); } }
+@keyframes cat-portal-runes { from { opacity: .6; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .cat-return-hole::before, .cat-return-hole::after { animation: none; }
 }
 
 /* The same animated value drives the actual rule and its cat anchor. */
