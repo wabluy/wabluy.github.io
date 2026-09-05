@@ -139,6 +139,7 @@ let catClosedOnPress = false;
 let catFocused = false;
 let catPointer = null;
 let catInteracting = false;
+let previousCatPreview = false;
 let activeCatControl = null;
 const isCatControl = control => control === petButton;
 const catControl = () => activeCatControl || petButton;
@@ -150,6 +151,11 @@ function updateCatInteraction() {
   petButton.setAttribute('aria-pressed', String(catPinned));
   petButton.setAttribute('aria-expanded', String(preview));
   petCard.dataset.interacting = String(active);
+  petCard.dataset.dismissed = String(catPreviewSuppressed);
+  if (preview !== previousCatPreview) {
+    previousCatPreview = preview;
+    petCard.dispatchEvent(new Event(preview ? 'catlaneraise' : 'catlanelower'));
+  }
   if (active === catInteracting) return;
   catInteracting = active;
   if (active) {

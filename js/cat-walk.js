@@ -40,6 +40,10 @@
   featherToy.draggable = false;
   featherToy.hidden = true;
   document.body.append(featherToy);
+  const desktopLane = matchMedia('(min-width: 1100px)');
+  let laneMotion = null;
+  let laneOffset = 0;
+  let catLift = 0;
   const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
   let active = false;
   let frameRequest = 0;
@@ -303,6 +307,29 @@
     groundLeg([18 + scoot, 23], foot, false, 4.5);
   }
 
+  function drawScared(progress = 1) {
+    const tuck = Math.max(0, Math.min(1, progress));
+    ctx.save();
+    ctx.translate(3 * tuck, 26 * .2 * tuck);
+    ctx.scale(1 - .08 * tuck, 1 - .2 * tuck);
+    body();
+    ctx.restore();
+    // Short paws and a wrapped tail make a compact ball, without stretching the torso.
+    head(-4 * tuck, 3 * tuck, 'aim', tuck);
+    line([[12, 23], [7, 24], [6, 20], [8, 17]], color.outline, 4);
+    line([[12, 23], [7, 24], [6, 20], [8, 17]], color.orange, 2);
+    rect(22, 25, 3, 2, color.cream);
+    rect(28, 25, 3, 2, color.cream);
+  }
+
+  function drawFalling(progress) {
+    tail(0, -1);
+    body();
+    head(-1, 0, 'aim', 1);
+    groundLeg([15, 22], [12, 26], true, 4);
+    groundLeg([26, 22], [30, 26], false, 4);
+  }
+
   function drawSploot(frame) {
     // Only the upper ribs rise by one pixel over a slow breathing cycle.
     // The grounded belly, paws, and fur markings stay still.
@@ -487,7 +514,9 @@
     ctx.clearRect(0, 0, 40, 28);
     tailRoot = { x: 11, y: 21 };
     stage.dataset.action = kind;
-    if (kind === 'grab') drawPlay(frame, progress);
+    if (kind === 'scared') drawScared(progress);
+    else if (kind === 'falling') drawFalling(progress);
+    else if (kind === 'grab') drawPlay(frame, progress);
     else if (kind === 'pounce') drawPounce(progress, frame);
     else if (kind === 'tail-enjoy') drawTailEnjoy(progress);
     else if (kind === 'pet') drawPet(progress);
@@ -521,7 +550,92 @@
     }
   }
 
+  function resetLane() {
+    laneMotion = null;
+    laneOffset = catLift = 0;
+    stage.style.removeProperty('transform');
+    delete stage.dataset.lane;
+  }
+
+  function raiseLane() {
+    if (!desktopLane.matches || reducedMotion.matches || pet.dataset.dismissed === 'true') return;
+    if (!active) activate();
+    if (!active) return;
+    const photo = document.querySelector('.pet-portrait').getBoundingClientRect();
+    const contact = document.querySelector('.profile-contact').getBoundingClientRect();
+    const floor = stage.getBoundingClientRect().bottom + laneOffset;
+    const desired = Math.min(photo.top - 16, Math.max(contact.bottom + canvas.getBoundingClientRect().height + 16, photo.top - 24));
+    const target = Math.max(0, floor - desired);
+    playStarted = petStarted = tailStarted = null;
+    pendingInput = walkAway = null;
+    pounceHeld = false;
+    chargePointer = null;
+    stroke = null;
+    clearCursor();
+    laneMotion = { kind: 'rising', start: performance.now(), from: laneOffset, catFrom: catLift, target };
+    stage.dataset.lane = 'rising';
+    lastPaint = -Infinity;
+  }
+
+  function lowerLane() {
+    if (pet.dataset.dismissed === 'true') { resetLane(); return; }
+    if (!laneMotion || !desktopLane.matches) return;
+    laneMotion = { kind: 'falling', start: performance.now(), from: laneOffset, catFrom: catLift };
+    stage.dataset.lane = 'falling';
+    lastPaint = -Infinity;
+  }
+
+  function tickLane(now) {
+    if (!laneMotion) return false;
+    const motion = laneMotion;
+    const elapsed = Math.max(0, now - motion.start);
+    const clamp = t => Math.max(0, Math.min(1, t));
+    const smooth = t => t * t * (3 - 2 * t);
+    let pose = 'scared', progress = 1, frame = Math.floor(elapsed / 80);
+    if (motion.kind === 'rising') {
+      const t = smooth(clamp(elapsed / 600));
+      laneOffset = motion.from + (motion.target - motion.from) * t;
+      catLift = motion.catFrom + (motion.target - motion.catFrom) * t;
+      progress = clamp(elapsed / 220);
+      if (elapsed >= 600) { laneMotion = { kind: 'raised', start: now }; stage.dataset.lane = 'raised'; }
+    } else if (motion.kind === 'falling') {
+      // The line falls first; the cat hesitates briefly, then drops under gravity.
+      laneOffset = motion.from * (1 - clamp(elapsed / 430) ** 2);
+      const fall = clamp((elapsed - 90) / 490);
+      catLift = motion.catFrom * (1 - fall * fall);
+      pose = elapsed < 90 ? 'scared' : 'falling';
+      progress = fall;
+      if (elapsed >= 580) {
+        laneOffset = catLift = 0;
+        laneMotion = { kind: 'landing', start: now }; stage.dataset.lane = 'landing';
+        pose = 'scared';
+      }
+    } else if (motion.kind === 'landing') {
+      progress = 1 - .25 * clamp(elapsed / 160);
+      if (elapsed >= 160) { laneMotion = { kind: 'grooming', start: now }; stage.dataset.lane = 'grooming'; }
+    } else if (motion.kind === 'grooming') {
+      pose = 'scratch';
+      progress = clamp(elapsed / 2400);
+      // Several quick chin rubs, then a small pause before walking away.
+      frame = Math.floor(elapsed / 75);
+      if (elapsed >= 2400) {
+        resetLane();
+        if (pet.dataset.interacting !== 'true') { stop(); return true; }
+        beginWalkAway(now);
+        return false;
+      }
+    }
+    if (now - lastPaint >= 1000 / 30) {
+      lastPaint = now;
+      stage.style.transform = `translate3d(0,${-laneOffset}px,0)`;
+      canvas.style.transform = `translate3d(${currentX}px,${laneOffset - catLift}px,0) scaleX(${direction})`;
+      paint(pose, frame, progress);
+    }
+    return true;
+  }
+
   function stop() {
+    resetLane();
     active = false;
     treat.hidden = true;
     playStarted = petStarted = tailStarted = null;
@@ -544,6 +658,7 @@
   function tick(now) {
     if (!active) return;
     if (document.hidden || !stage.isConnected || !pet.isConnected) { stop(); return; }
+    if (tickLane(now)) { if (active) frameRequest = requestAnimationFrame(tick); return; }
     if (pendingInput && !pounceHeld && playStarted !== null && playKind === 'pounce' && now - playStarted >= timing.pounce * pounceTiming.landing) {
       const input = pendingInput;
       pendingInput = null;
@@ -748,6 +863,7 @@
   }
 
   function startInput(kind, event, now) {
+    if (laneMotion) return;
     const current = petStarted !== null ? 'pet' : tailStarted !== null ? 'tail-enjoy' : playStarted !== null ? playKind : null;
     stroke = null;
     // Continuing the same gesture never rewinds its animation.
@@ -874,7 +990,18 @@
   window.addEventListener('blur', () => { releaseCharge(null, true); cursorPoint = null; clearCursor(); });
 
   pet.addEventListener('catpreviewstart', activate);
-  pet.addEventListener('catpreviewend', stop);
+  pet.addEventListener('catpreviewend', () => {
+    if (pet.dataset.dismissed === 'true' || !laneMotion) stop();
+    else lowerLane();
+  });
+  pet.addEventListener('catlaneraise', raiseLane);
+  pet.addEventListener('catlanelower', lowerLane);
+  window.addEventListener('resize', () => {
+    if (laneMotion && ['rising', 'raised'].includes(laneMotion.kind)) raiseLane();
+  });
+  desktopLane.addEventListener('change', () => {
+    if (laneMotion) { resetLane(); if (active) beginWalkAway(performance.now()); }
+  });
   if (pet.dataset.interacting === 'true') activate();
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) stop();
