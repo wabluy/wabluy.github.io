@@ -64,6 +64,7 @@
   const pounceTiming = { takeoff: .48, landing: .86 };
   let playKind = 'pounce';
   let playOrigin = 0;
+  let pounceBackstep = 0;
   let playTarget = 0;
   let petStarted = null;
   let tailStarted = null;
@@ -77,6 +78,8 @@
   let stroke = null;
   let currentX = 0;
   let direction = 1;
+  let turnMotion = null;
+  const turnDuration = 460;
 
   function rect(x, y, width, height, ink) {
     ctx.fillStyle = ink;
@@ -407,17 +410,97 @@
     paw([23, 24], [21, 22], [21, 20 + curl], false);
   }
 
+  function sprintPose(distance) {
+    const cycle = 15;
+    const phase = ((distance / cycle) % 1 + 1) % 1;
+    const air = phase > .37 && phase < .5 ? Math.sin((phase - .37) / .13 * Math.PI)
+      : phase > .87 ? Math.sin((phase - .87) / .13 * Math.PI) : 0;
+    const compression = phase < .3 ? Math.sin(phase / .3 * Math.PI) * .45 : 0;
+    const lift = compression - air * 1.4;
+    const arch = .8 * Math.sin(phase * Math.PI * 2) ** 2;
+    const foot = (x, offset) => gaitFoot(x, distance, offset, 4.5, .3, 3.1);
+    return { phase, lift, arch, feet: [foot(14, .5), foot(25, 0), foot(16, .43), foot(27, -.07)] };
+  }
+
   function drawSprint(distance) {
-    const phase = distance / (6 / .55) * Math.PI * 2;
-    const lift = -.6 * Math.sin(phase * 2) ** 2;
-    const foot = (x, offset) => gaitFoot(x, distance, offset, 6, .55, 2.5);
-    tail(lift, 1);
-    groundLeg([14, 21 + lift], foot(14, .5), true, 4);
-    groundLeg([25, 21 + lift], foot(25, 0), true, 4);
-    body(lift);
-    groundLeg([16, 22 + lift], foot(16, 0), false, 4);
-    groundLeg([27, 22 + lift], foot(27, .5), false, 4);
-    head(0, lift);
+    const { phase, lift, arch, feet } = sprintPose(distance);
+    // Forepaws receive the weight, hind paws push off, then all four briefly leave the ground.
+    tail(lift - arch * .4, Math.sin(phase * Math.PI * 2));
+    groundLeg([14, 21 + lift - arch], feet[0], true, 4);
+    groundLeg([25, 21 + lift], feet[1], true, 4);
+    body(lift, arch);
+    groundLeg([16, 22 + lift - arch * .65], feet[2], false, 4);
+    groundLeg([27, 22 + lift], feet[3], false, 4);
+    head(-arch * .35, lift * .7);
+  }
+
+  function drawTurn(progress) {
+    const smooth = t => { t = Math.max(0, Math.min(1, t)); return t * t * (3 - 2 * t); };
+    const half = progress < .5 ? progress : 1 - progress;
+    const bodyTurn = smooth(half * 2);
+    const look = smooth(half / .42);
+    const mix = (a, b) => a + (b - a) * bodyTurn;
+    const step = Math.sin(half * Math.PI * 2) * 1.5;
+    // Pass through a broad front-facing stance instead of flattening or flipping the silhouette.
+    const tailPoints = [[11,21],[6,20],[3,17],[3,13],[5,11]].map(([x,y]) => [mix(x,20),y]);
+    line(tailPoints, color.outline, 4);
+    line(tailPoints, color.orange, 2);
+    groundLeg([mix(14,17),21], [mix(14,18),26 - step], true, 4);
+    groundLeg([mix(25,23),21], [mix(25,22),26], true, 4);
+    ctx.save();
+    ctx.translate(20,0);
+    ctx.scale(1 - .18 * bodyTurn,1);
+    ctx.translate(-20 + 2 * bodyTurn,0);
+    body();
+    ctx.restore();
+    groundLeg([mix(16,17),22], [mix(16,16),26], false, 4);
+    groundLeg([mix(27,23),22], [mix(27,24),26 - step], false, 4);
+    head(-10 * look, .4 * bodyTurn);
+  }
+
+  function requestTurn(nextDirection, now = performance.now()) {
+    if (turnMotion) { turnMotion.next = nextDirection; return; }
+    if (nextDirection === direction) return;
+    const from = direction;
+    if (pounceHeld && playStarted !== null) {
+      // A charged cat pivots where its paws are planted, without jumping across its old origin.
+      playOrigin = currentX;
+      pounceBackstep = 0;
+    }
+    direction = nextDirection;
+    if (reducedMotion.matches) return;
+    turnMotion = { from, to: nextDirection, next: nextDirection, start: now, lastTick: now, progress: 0 };
+    paint('turn', 0, 0);
+  }
+
+  function tickTurn(now) {
+    if (!turnMotion) return false;
+    const turn = turnMotion;
+    const dt = Math.max(0, now - turn.lastTick);
+    turn.lastTick = now;
+    // Pause translation and reaction clocks while the paws change stance.
+    startedAt += dt;
+    if (playStarted !== null) playStarted += dt;
+    if (petStarted !== null) petStarted += dt;
+    if (tailStarted !== null) tailStarted += dt;
+    if (walkAway) walkAway.start += dt;
+    followTime = now;
+    turn.progress = Math.min(1, Math.max(0, (now - turn.start) / turnDuration));
+    if (now - lastPaint >= 1000 / 30) { lastPaint = now; paint('turn', 0, turn.progress); }
+    if (turn.progress >= 1) {
+      const next = turn.next;
+      turnMotion = null;
+      lastPaint = -Infinity;
+      if (next !== direction) requestTurn(next, now);
+    }
+    return true;
+  }
+
+  function travelProgress(progress, edge = .12) {
+    const ramp = t => (t - edge / Math.PI * Math.sin(Math.PI * t / edge)) / (2 * (1 - edge));
+    if (progress < edge) return ramp(progress);
+    if (progress > 1 - edge) return 1 - ramp(1 - progress);
+    return (progress - edge / 2) / (1 - edge);
   }
 
   function drawPet(progress) {
@@ -543,12 +626,19 @@
   function paint(kind, frame, progress = 0) {
     frame = Number.isFinite(frame) ? Math.max(0, Math.floor(frame)) : 0;
     progress = Number.isFinite(progress) ? Math.max(0, Math.min(1, progress)) : 0;
+    if (turnMotion) {
+      kind = 'turn';
+      progress = turnMotion.progress;
+      const facing = progress < .5 ? turnMotion.from : turnMotion.to;
+      canvas.style.transform = `translate3d(${currentX}px,0,0) scaleX(${facing})`;
+    }
     if (['walk', 'sprint', 'chase'].includes(kind)) gaitDistance += Math.abs(currentX - lastGaitX) / pixelScale;
     lastGaitX = currentX;
     ctx.clearRect(0, 0, 40, 28);
     tailRoot = { x: 11, y: 21 };
     stage.dataset.action = kind;
-    if (kind === 'scared') drawScared(progress);
+    if (kind === 'turn') drawTurn(progress);
+    else if (kind === 'scared') drawScared(progress);
     else if (kind === 'falling') drawFalling(progress);
     else if (kind === 'grab') drawPlay(frame, progress);
     else if (kind === 'pounce') drawPounce(progress, frame);
@@ -609,6 +699,7 @@
     stroke = null;
     clearCursor();
     featherFollowing = false;
+    turnMotion = null;
     laneMotion = { kind: 'rising', start: performance.now(), from: laneOffset, catFrom: catLift, target };
     stage.dataset.lane = 'rising';
     lastPaint = -Infinity;
@@ -672,6 +763,7 @@
   }
 
   function stop() {
+    turnMotion = null;
     resetLane();
     active = false;
     treat.hidden = true;
@@ -697,6 +789,7 @@
     if (!active) return;
     if (document.hidden || !stage.isConnected || !pet.isConnected) { stop(); return; }
     if (tickLane(now)) { if (active) frameRequest = requestAnimationFrame(tick); return; }
+    if (tickTurn(now)) { frameRequest = requestAnimationFrame(tick); return; }
     if (pendingInput && !pounceHeld && playStarted !== null && playKind === 'pounce' && now - playStarted >= timing.pounce * pounceTiming.landing) {
       const input = pendingInput;
       pendingInput = null;
@@ -719,7 +812,7 @@
       if (progress < 1) { frameRequest = requestAnimationFrame(tick); return; }
       currentX = walkAway.to;
       walkAway = null;
-      if ((direction === 1 && currentX >= travel - .5) || (direction === -1 && currentX <= .5)) direction *= -1;
+      if ((direction === 1 && currentX >= travel - .5) || (direction === -1 && currentX <= .5)) requestTurn(-direction, now);
       const along = travel ? (direction === 1 ? currentX / travel : 1 - currentX / travel) : 0;
       buildSequence(Math.max(0, Math.min(.999, along)));
       startedAt = now;
@@ -767,7 +860,7 @@
           const progress = playElapsed / duration;
           const pose = pouncePose(progress);
           const forward = 1 - (1 - pose.flight) ** 2;
-          const backstep = Math.min(3 * pixelScale, direction === 1 ? playOrigin : travel - playOrigin);
+          const backstep = pounceBackstep;
           currentX = playKind === 'pounce'
             ? playOrigin + (playTarget - playOrigin) * forward - direction * backstep * pose.retreat : playOrigin;
           const jump = playKind === 'pounce' ? Math.sin(pose.flight * Math.PI) * 10 : 0;
@@ -787,7 +880,7 @@
     let elapsed = Math.max(0, now - startedAt);
     if (elapsed >= totalDuration) {
       if (pet.dataset.pinned !== 'true') { stop(); return; }
-      direction *= -1;
+      requestTurn(-direction, now);
       buildSequence();
       startedAt = now;
       elapsed = 0;
@@ -802,7 +895,8 @@
         phaseTime -= phase.duration;
       }
       const progress = Math.min(1, phaseTime / phase.duration);
-      const along = phase.from + (phase.to - phase.from) * progress;
+      const moveProgress = travelProgress(progress, phase.kind === 'sprint' ? .14 : .08);
+      const along = phase.from + (phase.to - phase.from) * moveProgress;
       const position = direction === 1 ? along : 1 - along;
       currentX = travel * position;
       canvas.style.transform = `translate3d(${currentX}px,0,0) scaleX(${direction})`;
@@ -868,7 +962,7 @@
     stroke = null;
     clearCursor();
     let room = direction === 1 ? travel - currentX : currentX;
-    if (room < Math.min(36, travel * .2)) { direction *= -1; room = direction === 1 ? travel - currentX : currentX; }
+    if (room < Math.min(36, travel * .2)) { requestTurn(-direction, now); room = direction === 1 ? travel - currentX : currentX; }
     const distance = Math.min(room, 8 * pixelScale * 3);
     walkAway = { start: now, from: currentX, to: Math.max(0, Math.min(travel, currentX + direction * distance)) };
     lastPaint = -Infinity;
@@ -897,17 +991,15 @@
     const bounds = canvas.getBoundingClientRect();
     if (!bounds.width || !bounds.height) return null;
     const x = (event.clientX - bounds.left) / bounds.width * 40;
-    return { x: direction === 1 ? x : 40 - x,
+    const facing = turnMotion && turnMotion.progress < .5 ? turnMotion.from : direction;
+    return { x: facing === 1 ? x : 40 - x,
       y: (event.clientY - bounds.top) / bounds.height * 28 };
   }
 
   function faceFeather(event) {
     const bounds = canvas.getBoundingClientRect();
     const nextDirection = event.clientX < bounds.left + bounds.width / 2 ? -1 : 1;
-    if (direction !== nextDirection) {
-      direction = nextDirection;
-      canvas.style.transform = `translate3d(${currentX}px,0,0) scaleX(${direction})`;
-    }
+    requestTurn(nextDirection);
   }
 
   function featherTarget(event, gap = 8) {
@@ -931,6 +1023,7 @@
     const point = cursorPoint && pointerOnSprite(cursorPoint);
     if (!point || cursorZone(point) !== 'front') { endFeatherFollow(now); return false; }
     faceFeather(cursorPoint);
+    if (turnMotion) return true;
     const target = featherTarget(cursorPoint);
     const dt = Math.max(0, Math.min(.06, (now - followTime) / 1000));
     followTime = now;
@@ -997,6 +1090,7 @@
     chargePointer = pounceHeld ? event.pointerId : null;
     playOrigin = currentX;
     faceFeather(event);
+    pounceBackstep = Math.min(3 * pixelScale, direction === 1 ? playOrigin : travel - playOrigin);
     const target = featherTarget(event, 0);
     playTarget = currentX + Math.sign(target - currentX) * Math.min(70, Math.abs(target - currentX));
     featherToy.style.left = `${event.clientX - 22}px`;
