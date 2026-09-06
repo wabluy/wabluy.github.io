@@ -195,18 +195,21 @@
     if(!far)pawEdge(end[0]-1,end[1]);
   }
 
+  function softForeleg(root, elbow, paw, far = false) {
+    const ink=far?color.stripe:color.orange;
+    // Leave the shoulder open inside the chest; outline only the exposed lower leg.
+    line([mixPoint(root,elbow,.45),elbow,paw],far?color.stripe:color.outline,3);
+    line([root,elbow,paw],ink,2);
+    const dx=elbow[0]-root[0],dy=elbow[1]-root[1],length=Math.hypot(dx,dy)||1;
+    const nx=-dy/length,ny=dx/length,m= mixPoint(root,elbow,.55);
+    polygon([[root[0]+nx*1.6,root[1]+ny*1.6],[root[0]-nx*1.6,root[1]-ny*1.6],
+      [m[0]-nx,m[1]-ny],[m[0]+nx,m[1]+ny]],ink);
+    rect(paw[0]-1,paw[1]-1,3,2,far?color.light:color.cream);
+    if(!far)pawEdge(paw[0]-1,paw[1]);
+  }
   function frontLeg(root, foot, far = false) {
-    // A tapered chest-to-wrist contour keeps the foreleg soft, with a small rounded paw.
-    const rx=root[0],ry=root[1],fx=foot[0],fy=foot[1];
-    const ex=rx+(fx-rx)*.35,ey=ry+(fy-ry)*.5;
-    const half=far?1.2:1.7;
-    polygon([[rx-half,ry-1],[rx+half,ry-1],[ex+1.2,ey],[fx+1,fy-2],
-      [fx+2,fy-1],[fx+2,fy],[fx+1,fy+1],[fx-1,fy+1],[fx-2,fy],
-      [fx-1.2,fy-2],[ex-half,ey]],far?color.stripe:color.outline);
-    polygon([[rx-half+.5,ry-1],[rx+half-.5,ry-1],[ex+.6,ey],[fx+.5,fy-2],
-      [fx+1.5,fy-1],[fx+1,fy],[fx-1,fy],[fx-.6,fy-2],[ex-half+.6,ey]],color.orange);
-    polygon([[fx-1,fy-1],[fx+1,fy-1],[fx+1.5,fy],[fx+1,fy+.6],[fx-1,fy+.6]],far?color.light:color.cream);
-    pawEdge(fx-1,fy,2);
+    const elbow=[root[0]+(foot[0]-root[0])*.35,root[1]+(foot[1]-root[1])*.5];
+    softForeleg(root,elbow,foot,far);
   }
 
   function tail(bob, sway = 0, sitting = false) {
@@ -223,9 +226,9 @@
     rect(tipX - 1, tipY, 2, 2, color.stripe);
   }
 
-  function body(bob = 0, rump = 0, stretch = 0) {
+  function body(bob = 0, rump = 0, stretch = 0, hipSway = 0) {
     const rise = x => rump * Math.max(0, Math.min(1, (26 - x) / 15));
-    const shift = points => points.map(([x, y]) => [x + Math.min(0,x-23)*stretch, y + bob - rise(x)]);
+    const shift = points => points.map(([x, y]) => [x + Math.min(0,x-23)*stretch + hipSway*Math.max(0,Math.min(1,(26-x)/15)), y + bob - rise(x)]);
     polygon(shift([[6.5,17],[8.5,14],[11.8,11.7],[16,11.7],[19,13],[23,11],[26,14],[28,17],[28,20],[25,23],[21,22],[19,23.3],[17,24],[15,24],[13,23.3],[11,22.4],[7.5,22.4],[5.5,20]]), color.outline);
     polygon(shift([[7.5,17],[9.5,15],[11.8,12.7],[16,12.7],[19,14],[23,12],[25,15],[27,18],[27,20],[24,22],[20,21],[18,22.3],[17,23],[15,23],[13,22.3],[11,21.4],[8.5,21.4],[6.5,19]]), color.orange);
     polygon(shift([[10,17],[12,15],[16,15],[19,16],[21,16],[22,18],[16,18],[12,19],[10,18]]),color.light);
@@ -360,7 +363,7 @@
     poseBody(shift([[10,22],[12,17],[17,14],[22,14],[25,18],[26,23],[23,26],[13,26]]),
       shift([[11,22],[13,18],[17,15],[21,15],[24,18],[25,22],[22,25],[13,25]]),
       [[14,20],[21,20],[25,18],[27,19],[25,21],[20,22],[18,22],[18,23],[15,23],[14,22],[12,21]],reach);
-    frontLeg([29, 19], [29, 26]);
+    frontLeg([27, 20], [29, 26]);
     head(0,0,reach>.3?'content':'normal');
     const rub = reach > .95 ? Math.round(Math.sin(frame * Math.PI / 3)) : 0;
     const foot = [19 + 9 * reach, 26 - 4 * reach + rub];
@@ -372,17 +375,20 @@
     // A slow play-bow: planted hind paws, rounded raised hips and reaching forepaws.
     poseTail([[12,18],[7,16],[5,12],[6,8],[8,7]],stretch);
     groundLeg(mixPoint([11,20],[12,18],stretch),mixPoint(gaitFoot(11,0,.5),[11,26],stretch),true,4.5);
-    frontLeg(mixPoint([23,20],[25,22],stretch),mixPoint(gaitFoot(23,0,.75),[32,26],stretch),true);
+    softForeleg(mixPoint([23,20],[23,21],stretch),mixPoint([23,23],[27,24],stretch),mixPoint(gaitFoot(23,0,.75),[32,26],stretch),true);
     poseBody([[8,17],[10,13],[14,11],[18,13],[22,17],[26,20],[29,23],[28,26],[23,26],[18,23],[14,21],[10,21],[7,19]],
       [[9,17],[11,14],[14,12],[17,14],[21,18],[25,21],[28,24],[27,25],[23,25],[18,22],[14,20],[10,20],[8,19]],
       [[15,19],[20,20],[26,23],[28,25],[22,25],[18,22]],stretch);
     groundLeg(mixPoint([13,20],[15,18],stretch),mixPoint(gaitFoot(13,0),[15,26],stretch),false,4.5);
-    head(-stretch,-1+3.5*stretch,stretch>.35?'content':'normal');
+    // The shoulder stays inside the lowered chest; the elbow unfolds along the floor.
+    // Draw the arm before the head so the cheek overlaps its root, not vice versa.
     const paw=mixPoint(gaitFoot(28,0,.25),[36,26],stretch);
-    frontLeg(mixPoint([28,20],[28,23],stretch),paw);
+    softForeleg(mixPoint([28,20],[24.5,21.5],stretch),
+      mixPoint([28,23],[29,24.5],stretch),paw);
+    head(-stretch,-1+3.5*stretch,stretch>.35?'content':'normal');
     if(stretch>.65){
-      rect(31,25,4,1,color.light);rect(34,25,5,1,color.cream);
-      rect(35,25,1,1,color.light);rect(37,25,1,1,color.light);
+      rect(paw[0]-1,25,4,2,color.cream);pawEdge(paw[0]-1,26,4);
+      rect(paw[0],26,1,1,color.light);rect(paw[0]+2,26,1,1,color.light);
     }
   }
 
@@ -397,21 +403,25 @@
       [[16,21],[22,20],[24,24],[20,26],[16,25]],settle);
     groundLeg(mixPoint([13,20],[16,24],settle),mixPoint([13,26],[18,26],settle),false,4);
     if (belly) {
-      // A seated cat balances on one haunch, raises its hind leg, and folds toward its belly.
-      const knee = [12, 22 - 7 * settle];
-      const paw = [12, 26 - 16 * settle];
-      line([[16, 24], knee, paw], color.outline, 4);
-      line([[16, 24], knee, paw], color.orange, 2);
-      rect(paw[0] - 1, paw[1] - 1, 3, 3, color.cream);pawEdge(paw[0]-1,paw[1]+1);
-      polygon([[16, 21], [22, 20], [24, 24], [20, 26], [16, 25]], color.cream);
-      head(-8*dip,2*dip,settle>.25?'content':'normal',0,.4*dip);
-      if (settle > .8 && cycle > .65) rect(21, 24, 2, 1, color.pink);
-      groundLeg([25, 23], [27, 26], false, 3.5);
+      // Sit first, fold the knee, then extend the lower leg. Reverse that order before standing.
+      const lift=easePose((progress-.1)/.22)*(1-easePose((progress-.67)/.2))*actionWeight;
+      const extend=easePose((lift-.35)/.65);
+      const root=mixPoint([13,20],[16,24],settle);
+      const knee=mixPoint(mixPoint([13,23],[15,25],settle),[12,20],lift);
+      const folded=mixPoint(mixPoint([13,26],[18,26],settle),[14,21],lift);
+      const paw=mixPoint(folded,[12,13],extend);
+      line([mixPoint(root,knee,.35),knee,paw],color.outline,3);
+      line([root,knee,paw],color.orange,2);
+      rect(paw[0]-1,paw[1]-1,3,2,color.cream);pawEdge(paw[0]-1,paw[1]);
+      const groomingDip=dip*(.3+.7*lift);
+      head(-8*groomingDip,2*groomingDip,settle>.25?'content':'normal',0,.4*groomingDip);
+      if(lift>.8&&cycle>.65)rect(21,24,2,1,color.pink);
+      frontLeg([24,21],[27,26]);
     } else {
       // Repeated head dips bring the muzzle down onto the foreleg fur.
-      groundLeg([25, 22], [26, 26], true);
+      frontLeg([24,20],[26,26],true);
       head(-4*dip,1.5*dip,settle>.25?'content':'normal',0,.32*dip);
-      groundLeg([27, 24], [29, 26 - 2 * settle], false, 3);
+      frontLeg([25,21],[29,26-2*settle]);
       if (settle > .8 && cycle > .65) rect(28, 23, 2, 1, color.pink);
       rect(13, 25, 4, 2, color.cream);pawEdge(13,26,4);
     }
@@ -470,22 +480,25 @@
   }
 
   function drawBelly(frame,progress) {
-    const roll=poseLevel(progress),curl=Math.sin(frame/12*Math.PI)*.6*roll;
-    const paw=(root,elbow,tip,standingRoot,standingTip,far)=>{
-      const r=mixPoint(standingRoot,root,roll),end=mixPoint(standingTip,tip,roll);
-      limb([r,mixPoint([(standingRoot[0]+standingTip[0])/2,24],elbow,roll),end],far);
-      if(roll>.6)rect(end[0],end[1],1,1,color.pink);
+    const amount=poseLevel(progress),side=easePose(amount/.65),roll=easePose((amount-.4)/.6);
+    const curl=Math.sin(frame/15*Math.PI)*.4*roll;
+    const paw=(root,elbow,tip,standingRoot,standingTip,far,front=false)=>{
+      const r=mixPoint(standingRoot,root,side),end=mixPoint(standingTip,tip,side);
+      const joint=mixPoint([(standingRoot[0]+standingTip[0])/2,24],elbow,side);
+      if(front)softForeleg(r,joint,end,far);else limb([r,joint,end],far);
+      if(roll>.7)rect(end[0],end[1],1,1,color.pink);
     };
-    poseTail([[11,23],[8,24],[6,25],[4,24],[3,23]],roll);
-    paw([12,19],[10,17],[11,14+curl],[14,21],[14,26],true);
-    paw([21,18],[20,16],[21,13-curl],[25,21],[25,26],true);
-    poseBody([[8,20],[10,15],[17,13],[25,16],[29,22],[26,26],[11,26]],
-      [[9,20],[11,16],[17,14],[24,17],[28,22],[25,25],[11,25]],
-      [[12,19],[15,16],[21,17],[25,21],[23,25],[13,25]],roll);
-    ctx.save();ctx.translate(30,15);ctx.rotate(-Math.PI*roll);ctx.translate(-30,-15);
-    head(0,0,roll>.3?'content':'normal');ctx.restore();
-    paw([12,24],[12,22],[14,20-curl],[16,22],[16,26],false);
-    paw([23,24],[21,22],[21,20+curl],[30,22],[31,26],false);
+    poseTail([[11,23],[8,24],[6,25],[4,24],[3,23]],side);
+    paw([12,22],[11,20-3*roll],[12,22-7*roll+curl],[11,20],gaitFoot(11,0,.5),true);
+    paw([24,21],[25,22-5*roll],[27,24-9*roll-curl],[23,20],gaitFoot(23,0,.75),true,true);
+    const blend=(a,b)=>mixContour(a,b,roll);
+    poseBody(blend([[7,22],[10,18],[17,17],[25,19],[29,23],[26,26],[10,26]],[[7,22],[10,17],[17,15],[25,17],[29,22],[26,26],[10,26]]),
+      blend([[8,22],[11,19],[17,18],[24,20],[28,23],[25,25],[11,25]],[[8,22],[11,18],[17,16],[24,18],[28,22],[25,25],[11,25]]),
+      blend([[12,24],[15,22],[21,22],[25,23],[23,25],[13,25]],[[11,21],[15,18],[21,18],[25,21],[23,25],[12,25]]),side);
+    // Settle onto one shoulder, then expose the belly; the head never spins upside down.
+    head(-2*side,3*side,side>.3?'content':'normal',0,.32*roll);
+    paw([13,23],[14,22],[16,23-2*roll-curl],[13,20],gaitFoot(13,0,0),false);
+    paw([25,22],[26,21],[28,23-3*roll+curl],[28,20],gaitFoot(28,0,.25),false,true);
   }
 
   function sprintPose(distance) {
@@ -595,7 +608,7 @@
     tail(0, Math.round(Math.sin(progress * Math.PI * 2)));
     body(0);
     groundLeg([16, 22], [16, 26]);
-    frontLeg([29, 19], [29, 26]);
+    frontLeg([27, 20], [29, 26]);
     head(0,nuzzle,actionWeight>.4?'pet':'normal');
   }
 
@@ -616,7 +629,7 @@
     groundLeg([25, 22], [25, 26], true);
     body(0, lift);
     groundLeg([16, 22 - lift * .67], [15, 26]);
-    frontLeg([29, 19], [29, 26]);
+    frontLeg([27, 20], [29, 26]);
     head(0, Math.round(raised), raised>.2?'pet':'normal');
   }
 
@@ -640,18 +653,18 @@
     const aiming = progress < pounceTiming.takeoff;
     const reach = Math.sin(flight * Math.PI)*actionWeight;
     const hip = aiming ? wiggle * 1.6 * actionWeight : 0;
-    // Fold the short legs under the plump body; paws remain on the ground while aiming.
-    tail(crouch, Math.round(wiggle * 1.5));
-    groundLeg([14 + hip, 22 + crouch * 2], [14 - 2 * reach, 26 - 2 * reach], true, 4);
-    groundLeg([25, 22 + crouch * 2], [26 + 4 * reach, 26 - 2 * reach], true, 4);
-    ctx.save();
-    ctx.translate(hip, 26 * .1 * crouch);
-    ctx.scale(1, 1 - .1 * crouch);
-    body();
-    ctx.restore();
-    groundLeg([16 + hip, 22 + crouch * 2], [16 - 3 * reach, 26 - 2 * reach], false, 4);
-    groundLeg([30, 22 + crouch * 2], [31 + 5 * reach, 26 - 3 * reach], false, 4);
-    head(0,2*crouch,aiming&&actionWeight>.3?'aim':'normal',prep*actionWeight);
+    // Only the haunches sway; the chest and planted feet do not translate with the hips.
+    const plant=aiming?pounceBackstep*pose.retreat*actionWeight/pixelScale:0;
+    const foot=(x,dx,dy)=>[x+plant+dx*reach,26+dy*reach];
+    tail(crouch, Math.sin(frame*.36)*.65*crouch);
+    groundLeg([11+hip,20+crouch*.6],foot(13,-2,-2),true,4);
+    frontLeg([23,20+crouch*.6],foot(24,4,-2),true);
+    ctx.save();ctx.translate(0,26*.1*crouch);ctx.scale(1,1-.1*crouch);
+    body(0,0,0,hip);ctx.restore();
+    groundLeg([13+hip*.87,20+crouch*.6],foot(15,-3,-2),false,4);
+    frontLeg([28,20+crouch*.6],foot(28.5,5,-3));
+    head(0,-1+3*crouch,aiming&&actionWeight>.3?'aim':'normal',prep*actionWeight);
+
   }
 
   function drawChase(distance) {
@@ -686,9 +699,7 @@
     const dx=paw[0]-shoulder[0],dy=paw[1]-shoulder[1],distance=Math.hypot(dx,dy)||1;
     const bone=3+(6.2-3)*rise,bend=Math.sqrt(Math.max(0,bone*bone-distance*distance/4));
     const elbow=[(shoulder[0]+paw[0])/2-dy/distance*bend,(shoulder[1]+paw[1])/2+dx/distance*bend];
-    line([shoulder,elbow,paw],color.outline,3);
-    line([shoulder,elbow,paw],color.orange,2);
-    rect(paw[0]-1,paw[1]-1,3,2,color.cream);pawEdge(paw[0]-1,paw[1]);
+    softForeleg(shoulder,elbow,paw);
     rasterTop=previousRasterTop;ctx.restore();
   }
   function drawPlay(frame, progress, singleTap = false) {
@@ -717,21 +728,19 @@
     const angle = n => (90+(from[n]+(to[n]-from[n])*t-90)*actionWeight)*Math.PI/180;
     const foreleg = (far) => {
       // Shoulder attachment follows the same torso transform throughout the rise.
-      const shoulder = [mix(far ? 25 : 30, far ? 24 : 25), mix(22,18)];
-      const upper = angle(far ? 3 : 1);
-      const lower = angle(far ? 4 : 2);
-      const reach = mix(2, 2.8);
+      const shoulder = [mix(far?23:26,far?22:singleTap?24:25),mix(20,singleTap?17:20)];
+      const upper = far||singleTap?angle(far?3:1):Math.max(0,angle(1));
+      const lower = far||singleTap?angle(far?4:2):Math.max(-.25,angle(2));
+      const reach = mix(3, singleTap?2.8:far?3.2:4.2);
       let elbow = [shoulder[0] + reach * Math.cos(upper), shoulder[1] + reach * Math.sin(upper)];
       let paw = [elbow[0] + reach * Math.cos(lower), elbow[1] + reach * Math.sin(lower)];
       // Slim forelegs avoid the heavy block that previously covered the entire chest.
-      line([shoulder, elbow, paw], color.outline, 3);
-      line([shoulder, elbow, paw], far ? color.stripe : color.orange, 2);
-      rect(paw[0] - 1, paw[1] - 1, 3, 2, far ? color.light : color.cream);
-      pawEdge(paw[0]-1,paw[1]);
+      softForeleg(shoulder,elbow,paw,far);
     };
     const morph = (standing,seated) => mixContour(standing,seated,upright);
     tail(0, Math.round(Math.sin(progress * Math.PI * (singleTap ? 1 : 4)) * upright));
     limb([[14,23],[14,25],[14,26]],true);
+    foreleg(true);
     polygon(morph(
       [[6.5,17],[8.5,14],[11.8,11.7],[16,11.7],[19,13],[23,11],[26,14],[28,17],[28,20],[25,23],[21,22],[19,23.3],[17,24],[15,24],[13,23.3],[11,22.4],[7.5,22.4],[5.5,20]],
       [[10,20],[13,16],[18,12],[23,10],[26,13],[26,19],[25,23],[23,25],[12,25],[9,23],[8,21]]), color.outline);
@@ -743,7 +752,6 @@
     rect(18, mix(13,15), 2, 3, color.stripe);
     limb([[16,23],[16,25],[16,26]]);
     head(-Math.round(4 * upright), -Math.round(3 * upright), upright>.2?'aim':'normal', upright);
-    foreleg(true);
     foreleg(false);
   }
 
