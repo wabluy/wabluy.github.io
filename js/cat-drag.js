@@ -9,8 +9,10 @@
   const about=stage.parentElement;
   let occupiedLine=null;
   function reserveLine(item) {
+    const next=item&&item.id!=='home'?item.element:null;
+    if(occupiedLine===next)return;
     if(occupiedLine)delete occupiedLine.dataset.catOccupied;
-    occupiedLine=item&&item.id!=='home'?item.element:null;
+    occupiedLine=next;
     if(occupiedLine)occupiedLine.dataset.catOccupied='true';
   }
   function homeVacant(value) { about.dataset.catVacant=String(value); }
@@ -41,7 +43,7 @@
   let portalWanted=true;
   let nextWanderAt=performance.now()+25000;
   let state=null,holdTimer=0,lastTick=0,releasingCapture=false,lastHover=null;
-  let viewportDirty=false,viewportChangedAt=0,lastVisibleBox=null;
+  let viewportDirty=false,viewportChangedAt=0;
   function lineRect(element,edge='top') {
     if(!element?.isConnected)return null;
     const r=element.getBoundingClientRect();
@@ -77,19 +79,17 @@
     return target.id==='home'?null:{mode:'parked',target,deadline:Infinity,viewportFollow:true};
   }
   function portalTo(target,now,follow=false) {
+    const origin=currentLine(state?.target||{id:'home',element:home});
     returnHome(now);
+    // A transported sprite may still have its previous frame's screen position
+    // immediately after scrolling. Anchor departure to the real document line.
+    if(origin)state.from.y=origin.y+width()*.025;
     state.excursion={target,parked:resident(target),fraction:.2+Math.random()*.6};
-    if(follow) {
-      state.viewportTransfer=true;
-      const b=lastVisibleBox||{x:state.from.x-sx(),y:state.from.y-sy()};
-      state.viewportFrom={x:b.x,y:clamp(b.y,width()+16,innerHeight-12)};
-    }
+    if(follow)state.viewportTransfer=true;
   }
   function viewportChanged() {viewportDirty=true;viewportChangedAt=performance.now();}
   function followViewport(now) {
     if(!portalWanted||!api.active()||(state&&state.mode!=='parked')||state?.platformMotion)return;
-    const b=canvas.getBoundingClientRect();
-    if(b.bottom>=width()*.7&&b.bottom<=innerHeight-8)lastVisibleBox={x:b.left,y:b.bottom};
     if(!viewportDirty||now-viewportChangedAt<100||api.interacting?.(now))return;
     const target=viewportTarget();if(!target)return;
     viewportDirty=false;
@@ -382,11 +382,11 @@
     canvas.style.opacity='1';
   }
   function finishHidden() {
-    state=null;restoreHome();api.hide();
+    state=null;restoreHome();homeVacant(true);api.hide();
   }
   function appear() {
     portalWanted=true;
-    restoreHome();api.pause();
+    restoreHome();homeVacant(true);api.pause();
     if(introCard?.dataset.intro==='pending' && introStarted!==introCard.dataset.introSequence && introButton) {
       introStarted=introCard.dataset.introSequence;
       if(!api.reduced()) {
@@ -463,7 +463,7 @@
     }
   }
   function tickPortal(now) {
-    if(state.viewportFrom)state.from={x:state.viewportFrom.x+sx(),y:state.viewportFrom.y+sy()};
+    const elapsed=Math.max(0,now-state.start)+(state.mode==='entering'?portalExit:0);
     // While fully inside a gate, follow the latest visible destination safely.
     if(state.viewportTransfer && now-state.start<(state.mode==='entering'?portalTiming.open:portalExit+portalTiming.open) &&
       !visibleLine(state.excursion?currentLine(state.excursion.target):homeRect())) {
@@ -473,6 +473,14 @@
     let r=state.excursion?currentLine(state.excursion.target):homeRect();
     if(!r&&state.excursion){delete state.excursion;r=homeRect();}
     if(!r){cancel();return;}
+    if(state.mode!=='exiting' && elapsed>=portalExit && (portalWanted||state.homeReserved)) {
+      const target=state.excursion?.target||{id:'home',element:home};
+      if(state.reservedTarget!==target.element) {
+        reserveLine(target);homeVacant(target.id!=='home');
+        state.homeReserved=true;state.reservedTarget=target.element;
+        r=currentLine(target)||r;
+      }
+    }
     const w=width(),available=Math.max(0,r.width-w);
     // Keep a sampled entry location stable throughout the animation and resizing.
     // The portal sits to the left of the arriving cat, so it needs more room there.
@@ -482,7 +490,6 @@
       :leftMargin+(available-leftMargin-rightMargin)*state.entryFraction;
     const goalX=r.left+offset,goalY=r.y+w*.025;
     if(api.reduced()){if(!portalWanted){finishHidden();return;}finishArrival(r,goalX,now);api.presented();return;}
-    const elapsed=Math.max(0,now-state.start)+(state.mode==='entering'?portalExit:0);
     // Settle, trace a circle with one paw, then walk through the completed ring.
     if(elapsed<portalExit) {
       const trace=clamp((elapsed-portalTiming.settle)/portalTiming.trace,0,1);
@@ -501,6 +508,10 @@
       if(walking<0){canvas.style.removeProperty('clip-path');portalBack.hidden=true;portalCanvas.style.clipPath='none';}
       else portalOcclusion(left,feet,holeX,state.from.y-w*.025,f);
       canvas.style.opacity=p>=1?'0':'1';
+      if(p>=1&&!state.departureReleased) {
+        // Once the cat is fully inside, release its old line during gate closure.
+        reserveLine(null);homeVacant(true);state.departureReleased=true;
+      }
       return;
     }
     if(state.mode==='exiting'){
@@ -508,7 +519,6 @@
       return;
     }
     if(state.mode==='returning' && !portalWanted && !state.homeReserved){finishHidden();return;}
-    if(!state.homeReserved){if(!state.excursion?.parked){reserveLine(null);homeVacant(false);}state.homeReserved=true;}
     const enter=elapsed-portalExit,holeX=goalX-w*.12;
     // Sample once per arrival. Neither a new frame nor a resize changes its mood.
     if(!state.arrival)state.arrival={walk:3000+Math.random()*400,

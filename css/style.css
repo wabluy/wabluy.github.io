@@ -83,7 +83,7 @@ nav:has(a:hover) a:not(:hover)::after { opacity: 0; }
 .pet-toggle:hover { color: var(--body); }
 .pet-toggle[aria-pressed='true'], .pet-toggle[data-pressing='true'] { color: #c58049; }
 .pet-toggle svg { width: 18px; height: 18px; }
-.pet-portrait { position: fixed; top: auto; right: calc(16px + env(safe-area-inset-right, 0px)); left: auto; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 5; width: 160px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); box-shadow: 0 12px 32px rgb(0 0 0 / .24); text-align: center; visibility: hidden; opacity: 0; pointer-events: none; transition: opacity 200ms cubic-bezier(.4, 0, .2, 1), visibility 0s linear 200ms; }
+.pet-portrait { position: fixed; top: auto; right: calc(16px + env(safe-area-inset-right, 0px)); left: auto; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 5; width: 160px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); box-shadow: 0 12px 32px rgb(0 0 0 / .24); text-align: center; visibility: hidden; opacity: 0; pointer-events: none; transition: opacity 4000ms cubic-bezier(.33, 0, .67, 1), visibility 0s linear 4000ms; }
 .pet-card[data-open='true'] .pet-portrait { visibility: visible; opacity: 1; transition: opacity 360ms cubic-bezier(.4, 0, .2, 1), visibility 0s; }
 .pet-photo { display: block; width: 92px; height: 92px; overflow: hidden; border-radius: 50%; border: 1px solid var(--line); margin: 0 auto 8px; }
 .pet-photo img { display: block; width: 100%; height: 100%; object-fit: cover; transform: scale(1.6); transform-origin: 60% 68%; }
@@ -176,14 +176,14 @@ footer { display: flex; align-items: center; justify-content: flex-end; gap: 16p
   .header-actions > .pet-card { display: block; }
   .pet-portrait {
     border: 0; background: transparent; box-shadow: none;
-    transition: opacity 200ms cubic-bezier(.4, 0, .2, 1), visibility 0s linear 200ms;
+    transition: opacity 4000ms cubic-bezier(.33, 0, .67, 1), visibility 0s linear 4000ms;
   }
   .pet-card[data-open='true'] .pet-portrait {
     transition: opacity 360ms cubic-bezier(.4, 0, .2, 1), visibility 0s;
   }
   .pet-portrait .pet-photo {
     border: 0; filter: blur(1.2px);
-    transition: filter 200ms cubic-bezier(.4, 0, .2, 1);
+    transition: filter 4000ms cubic-bezier(.33, 0, .67, 1);
   }
   .pet-card[data-open='true'] .pet-photo {
     filter: blur(0);
