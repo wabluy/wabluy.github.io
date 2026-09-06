@@ -101,6 +101,9 @@
   }
   function viewportTarget() {
     const current=standingTarget();
+    // The desktop sidebar is fixed. Only explicit dragging may choose another
+    // residence; content selection and scrolling never borrow a right-hand rule.
+    if(desktop.matches)return state?.manualPlacement&&current?current:{id:'home',element:home};
     if(selectedSection) {
       const target=targets().find(item=>item.id===selectedSection);
       // Residence survives visibility changes. Only a different, usable destination moves it.
@@ -300,7 +303,7 @@
     if(item.id==='home'&&returnTarget.id==='home'){state=null;restoreHome(x,facing);if(!portalWanted)returnHome(now,'exiting');return;}
     // Restore the lane and sprite transform in the same frame: no left-edge flash.
     const sameOrigin=item.element===returnTarget.element;
-    state={mode:'parked',target:item,returnTarget,viewportFollow:sameOrigin,deadline:sameOrigin?Infinity:now+10000};setLine(r);api.resume(x,facing);
+    state={mode:'parked',target:item,returnTarget,manualPlacement:true,viewportFollow:sameOrigin,deadline:sameOrigin?Infinity:now+10000};setLine(r);api.resume(x,facing);
     if(!portalWanted)returnHome(now,'exiting');
     else if(item.control)beginPrank(item,now);
   }
@@ -369,7 +372,7 @@
     }
     if(action>=2850)restorePrank(prank);
     if(action>=3200){
-      clearDecorations();state={mode:'parked',target:prank.target,returnTarget:prank.returnTarget,deadline:now+10000};
+      clearDecorations();state={mode:'parked',target:prank.target,returnTarget:prank.returnTarget,manualPlacement:true,deadline:now+10000};
       setLine(r);api.resume(clamp(prank.goal-r.left,0,r.width-w),prank.facing);
     }
   }
@@ -724,7 +727,7 @@
         state.interacting=false;
         state.deadline=state.viewportFollow?Infinity:now+5000;
       }
-      const returnTarget=(selectedSection&&targets().find(item=>item.id===selectedSection))||state.returnTarget||{id:'home',element:home};
+      const returnTarget=(!desktop.matches&&selectedSection&&targets().find(item=>item.id===selectedSection))||state.returnTarget||{id:'home',element:home};
       if(!state.viewportFollow&&now>=state.deadline&&returnTarget.element===state.target.element){state.viewportFollow=true;state.deadline=Infinity;}
       const originVisible=state.target.id==='header'?residentVisible(r,state.target):visibleLine(r);
       if(!state.viewportFollow&&now>=state.deadline&&originVisible&&visibleLine(currentLine(returnTarget))){
@@ -834,5 +837,8 @@
   document.addEventListener('keydown',event=>{if(event.key==='Escape'&&state){event.preventDefault();event.stopImmediatePropagation();cancel();}},true);
   window.addEventListener('scroll',()=>{scrollResumeAt=performance.now()+1050;viewportChanged();},{passive:true});
   window.addEventListener('blur',()=>{hoverProtectedUntil=0;lastHover=null;if(state&&['arming','dragging','prank'].includes(state.mode))cancel();});
-  desktop.addEventListener('change',()=>{if(state&&['arming','dragging'].includes(state.mode))release({pointerId:state.pointerId},true);viewportChanged();});
+  desktop.addEventListener('change',()=>{
+    if(state&&['arming','dragging'].includes(state.mode))release({pointerId:state.pointerId},true);
+    selectionVersion++;selectionReadyAt=performance.now();viewportChanged();
+  });
 })();
