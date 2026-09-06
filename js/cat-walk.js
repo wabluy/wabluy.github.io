@@ -618,17 +618,26 @@
   }
 
   function drawTurn(progress) {
-    // Two small planted steps, through a symmetric front-facing silhouette.
-    // The head leads the shoulders; the hips follow instead of snapping a side sprite.
-    const half=progress<.5?progress:1-progress;
-    const amount=easePose(half*2),look=easePose(half/.43);
+    // A continuous pivot with staggered paw placement, through a front view.
+    // World-space paw paths stay continuous when the sprite changes facing.
+    // One monotonic yaw through the whole turn: no easing toward a middle
+    // keyframe, no held front view, and no second animation after the midpoint.
+    const yaw=Math.PI*easePose(progress),cos=Math.cos(yaw),sin=Math.sin(yaw);
+    const amount=1-Math.abs(cos),look=amount;
     const mix=(a,b)=>a+(b-a)*amount;
-    const step=(offset)=>Math.sin(Math.PI*Math.max(0,Math.min(1,(half*2-offset)/.7)))**2*1.2;
-    const roots=[[11,20],[23,20],[13,20],[28,20]],centers=[[17,21],[23,21],[16,21],[24,21]];
+    const localX=x=>progress<.5?x:40-x;
+    const roots=[[11,20],[23,20],[13,20],[28,20]],depth=[-3,-3,4,4];
     const starts=[gaitFoot(11,0,.5),gaitFoot(23,0,.75),gaitFoot(13,0,0),gaitFoot(28,0,.25)];
-    const goals=[[18,26],[22,26],[16,26],[24,26]];
-    const feet=starts.map((foot,i)=>{const target=mixPoint(foot,goals[i],amount);target[1]-=step(i%2?.2:0);return target;});
-    const leg=i=>{const root=mixPoint(roots[i],centers[i],amount);if(i%2)frontLeg(root,feet[i],i<2);else groundLeg(root,feet[i],i<2,4);};
+    const windows=[[.04,.72],[.06,.44],[.30,.92],[.47,.98]];
+    const feet=starts.map((foot,i)=>{
+      const q=Math.max(0,Math.min(1,(progress-windows[i][0])/(windows[i][1]-windows[i][0])));
+      const x=foot[0]+(40-2*foot[0])*easePose(q);
+      return [localX(x),foot[1]-1.4*Math.sin(Math.PI*q)**2];
+    });
+    const leg=i=>{
+      const root=[localX(20+(roots[i][0]-20)*cos+depth[i]*sin),roots[i][1]+.7*sin];
+      if(i%2)frontLeg(root,feet[i],i<2);else groundLeg(root,feet[i],i<2,4);
+    };
     poseTail([[20,21],[20,20],[20,17],[20,12],[20,10]],amount);
     leg(0);leg(1);
     poseBody([[12,17],[13,14],[16,12],[20,11],[24,12],[27,14],[28,17],[28,22],[25,24],[15,24],[12,22]],
@@ -1347,10 +1356,9 @@
     }
     for (let i = 0; i < stopCount; i++) {
       walkTo(startPosition + (1 - startPosition) * (i + between(.65, 1.25)) / (stopCount + 1));
-      const choices = ['belly', 'yawn', 'scratch', 'stretch', 'groom', 'belly-groom', 'portal-hop'].filter(kind => kind !== previousAction);
+      const choices = ['yawn', 'scratch', 'stretch', 'groom', 'belly-groom', 'portal-hop'].filter(kind => kind !== previousAction);
       const kind = choices[Math.floor(Math.random() * choices.length)];
-      const duration = kind === 'stretch' ? between(3000, 3500) : (kind === 'groom' || kind === 'belly-groom') ? between(2400, 3000) : kind === 'belly' ? between(2600, 3400)
-        : between(1800, 2800);
+      const duration = kind === 'stretch' ? between(3000, 3500) : (kind === 'groom' || kind === 'belly-groom') ? between(2400, 3000) : between(1800, 2800);
       sequence.push({ kind, duration, from: position, to: position, frameMs: between(90, 140) });
       previousAction = kind;
     }
@@ -1528,7 +1536,7 @@
   }
 
   // Human input can interrupt automatic movement, including the quiet walk-away.
-  // No hover pause is needed: latch a brief stroke across small hit-area boundaries.
+  // Gestures reset at physical zone boundaries instead of retaining an old feather hit.
   document.addEventListener('pointermove', event => {
     if(event.pointerType==='mouse'||(event.pointerType==='pen'&&!event.buttons)){
       trackGazePoint(event.buttons?null:{clientX:event.clientX,clientY:event.clientY});
