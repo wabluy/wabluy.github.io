@@ -422,7 +422,7 @@
       [[16,12],[21,13],[25,20],[27,26],[26,30],[24,33],[15,33],[12,30],[11,26],[13,18]],
       [[18,23],[24,23],[26,27],[24,32],[17,32],[14,29],[15,25]],lift);
     groundLeg(mixPoint([16,22],[24,31],lift),mixPoint([16,26],[24,36-curl],lift),false,4);
-    head(-6*lift,2*lift,lift>.25?'aim':'normal',lift);
+    head(-6*lift,2*lift,'normal');
     groundLeg(mixPoint([30,22],[21,25],lift),mixPoint([31,26],[21,29-curl],lift),false,3);
     if(lift>.5){rect(19,29-curl,3,1,color.cream);rect(28,29-curl,3,1,color.cream);}
   }
