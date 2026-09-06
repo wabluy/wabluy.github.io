@@ -142,8 +142,8 @@
   }
   let lastInteractionMove = -Infinity;
   let featherFollowing = false;
-  let lastFeatherMotion=-Infinity;
   let followTime = 0;
+  const featherRunSpeed = 30; // Logical sprite pixels per second, also used for held approaches.
   let nearAttention=false,nearLast=0;
   let tailRoot = { x: 11, y: 21 };
   let petTimer = 0;
@@ -1189,7 +1189,7 @@
       const target=featherTarget(press.event,0),delta=target-currentX;
       const dt=Math.max(0,Math.min(.05,(now-press.lastTime)/1000));press.lastTime=now;
       if(Math.abs(delta)>60) {
-        currentX+=Math.sign(delta)*Math.min(Math.abs(delta)-60,30*pixelScale*dt);
+        currentX+=Math.sign(delta)*Math.min(Math.abs(delta)-60,featherRunSpeed*pixelScale*dt);
         canvas.style.transform=`translate3d(${currentX}px,0,0) scaleX(${direction})`;
         paint('sprint',0);frameRequest=requestAnimationFrame(tick);return;
       }
@@ -1499,7 +1499,8 @@
 
   function tickFeatherFollow(now) {
     if (!featherFollowing || playStarted !== null || petStarted !== null || tailStarted !== null) return false;
-    if(now-lastFeatherMotion>1100&&!featherPress&&!pounceHeld){endFeatherFollow(now);return false;}
+    // A still feather remains a target. Quiet attention owns arrival; elapsed
+    // time since mouse movement must never hand a running cat back to random actions.
     const point = cursorPoint && pointerOnSprite(cursorPoint);
     if (!point || cursorZone(point) !== 'front') { endFeatherFollow(now); return false; }
     faceFeather(cursorPoint);
@@ -1508,15 +1509,13 @@
     const dt = Math.max(0, Math.min(.06, (now - followTime) / 1000));
     followTime = now;
     const delta = target - currentX;
-    const speed=(8+22*easePose((Math.abs(delta)-25)/100))*pixelScale;
-    const running=speed>19*pixelScale;
-    const step = speed * dt;
+    const step = featherRunSpeed * pixelScale * dt;
     currentX += Math.sign(delta) * Math.min(Math.abs(delta), step);
     walkAway = null;
     if (now - lastPaint >= 1000 / 60 - .5) {
       lastPaint = now;
       canvas.style.transform = `translate3d(${currentX}px,0,0) scaleX(${direction})`;
-      paint(running?'sprint':'walk', 0);
+      paint('sprint', 0);
     }
     return true;
   }
@@ -1626,7 +1625,6 @@
     } else if ((!laneMotion || laneMotion.kind==='raised') && !reducedMotion.matches && zone === 'front' && !event.buttons &&
         playStarted === null && petStarted === null && tailStarted === null && !withinQuietReach(cursorPoint)) {
       if (!featherFollowing) followTime = now;
-      if(!previousPoint||Math.hypot(event.clientX-previousPoint.clientX,event.clientY-previousPoint.clientY)>=1)lastFeatherMotion=now;
       featherFollowing = true;
       faceFeather(event);
     } else if (featherFollowing && zone !== 'front') endFeatherFollow(now);
