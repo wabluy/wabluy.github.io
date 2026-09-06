@@ -1035,7 +1035,12 @@
         frameRequest=requestAnimationFrame(tick);return;
       }
       featherPress.charged=true;
-      startInput('pounce',featherPress.event,now);
+      faceFeather(featherPress.event);
+      const distance=Math.abs(featherTarget(featherPress.event,0)-currentX);
+      if(distance>70) {
+        featherPress.approaching=true;featherPress.lastTime=now;
+        playStarted=petStarted=tailStarted=null;walkAway=null;pendingInput=null;
+      } else startInput('pounce',featherPress.event,now);
     }
     // Reconcile after transport yields control as well as on hover events. An
     // event received during entry/drag must never leave a raised, empty lane.
@@ -1047,6 +1052,20 @@
     if (tickPoseHandoff(now)) { frameRequest=requestAnimationFrame(tick);return; }
     if (tickLane(now)) { if (active) frameRequest = requestAnimationFrame(tick); return; }
     if (tickTurn(now)) { frameRequest = requestAnimationFrame(tick); return; }
+    if (featherPress?.approaching) {
+      const press=featherPress;
+      faceFeather(press.event);
+      if(turnMotion){press.lastTime=now;frameRequest=requestAnimationFrame(tick);return;}
+      const target=featherTarget(press.event,0),delta=target-currentX;
+      const dt=Math.max(0,Math.min(.05,(now-press.lastTime)/1000));press.lastTime=now;
+      if(Math.abs(delta)>60) {
+        currentX+=Math.sign(delta)*Math.min(Math.abs(delta)-60,30*pixelScale*dt);
+        canvas.style.transform=`translate3d(${currentX}px,0,0) scaleX(${direction})`;
+        paint('sprint',0);frameRequest=requestAnimationFrame(tick);return;
+      }
+      press.approaching=false;
+      startInput('pounce',press.event,now);
+    }
     if (pendingInput && !pounceHeld && playStarted !== null && playKind === 'pounce' && now - playStarted >= timing.pounce * pounceTiming.landing) {
       const input = pendingInput;
       pendingInput = null;
@@ -1260,8 +1279,11 @@
         point.y >= headRegion.top - 5 && point.y <= headRegion.top + 16) return 'head';
     if (Math.abs(point.x - tailRoot.x) <= 6 && Math.abs(point.y - tailRoot.y) <= 7) return 'tail';
     if(point.x>=-2&&point.x<=42&&point.y>=0&&point.y<=canvas.height+2)return 'body';
-    if (((point.x > headRegion.right && point.x < headRegion.right + 66) || (point.x < 0 && point.x > -66)) &&
-        point.y >= headRegion.top - 12 && point.y <= headRegion.bottom + 12) return 'front';
+    const lane=stage.getBoundingClientRect();
+    const onLane=Number.isFinite(point.clientX)
+      ? point.clientX>=lane.left && point.clientX<=lane.left+lane.width
+      : (point.x>headRegion.right&&point.x<headRegion.right+66)||(point.x<0&&point.x>-66);
+    if(onLane && point.y>=headRegion.top-12 && point.y<=headRegion.bottom+12)return 'front';
     return null;
   }
 
@@ -1273,7 +1295,7 @@
 
   function showCursor(zone) {
     const touching=['head','tail','scruff','body'].includes(zone);
-    const playing=zone==='front'&&playStarted!==null;
+    const playing=zone==='front'&&(playStarted!==null||featherPress!==null);
     document.documentElement.classList.toggle('cat-cursor-scruff',zone==='scruff');
     document.documentElement.classList.toggle('cat-cursor-hand',touching);
     document.documentElement.classList.toggle('cat-cursor-feather',zone==='front'&&!playing);
@@ -1286,7 +1308,7 @@
     if (!bounds.width || !bounds.height) return null;
     const x = (event.clientX - bounds.left) / bounds.width * 40;
     const facing = turnMotion && turnMotion.progress < .5 ? turnMotion.from : direction;
-    return { x: facing === 1 ? x : 40 - x,
+    return { clientX:event.clientX,x: facing === 1 ? x : 40 - x,
       y: (event.clientY - bounds.top) / bounds.height * canvas.height };
   }
 
@@ -1321,14 +1343,15 @@
     const target = featherTarget(cursorPoint);
     const dt = Math.max(0, Math.min(.06, (now - followTime) / 1000));
     followTime = now;
-    const step = 8 * pixelScale * dt;
     const delta = target - currentX;
+    const running=Math.abs(delta)>70;
+    const step = (running?30:8) * pixelScale * dt;
     currentX += Math.sign(delta) * Math.min(Math.abs(delta), step);
     walkAway = null;
     if (now - lastPaint >= 1000 / 30) {
       lastPaint = now;
       canvas.style.transform = `translate3d(${currentX}px,0,0) scaleX(${direction})`;
-      paint('walk', 0);
+      paint(running?'sprint':'walk', 0);
     }
     return true;
   }
@@ -1406,7 +1429,7 @@
       }
       if (featherPress.charged) featherPress.event={clientX:event.clientX,clientY:event.clientY,pointerId:event.pointerId};
     }
-    if (!active || (event.pointerType !== 'mouse' && !(pounceHeld && event.pointerId===chargePointer))) { clearCursor(); return; }
+    if (!active || (event.pointerType !== 'mouse' && !((pounceHeld && event.pointerId===chargePointer)||(featherPress?.charged && event.pointerId===featherPress.pointerId)))) { clearCursor(); return; }
     const previousPoint = cursorPoint;
     cursorPoint = { clientX: event.clientX, clientY: event.clientY };
     if (!featherToy.hidden) {
@@ -1480,7 +1503,9 @@
   });
   function releaseCharge(event, cancelled = false) {
     if (featherPress && (!event || event.pointerId===featherPress.pointerId)) {
-      const press=featherPress;featherPress=null;
+      const press=featherPress;
+      featherPress=null;
+      if(press.approaching){featherFollowing=false;clearCursor();beginWalkAway(performance.now());return;}
       if (!press.charged) {
         if (!cancelled && featherWithinReach(press.event)) startInput('grab',press.event,performance.now());
         else clearCursor();
