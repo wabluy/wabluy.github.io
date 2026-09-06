@@ -372,3 +372,9 @@ footer { padding-block: 22px 28px; font-size: .75rem; }
   .about [data-i18n='intro'] { color: CanvasText; }
   .about a, .news-list a, .publication-reference a { text-decoration-color: LinkText; }
 }
+
+/* Tablet profile stays grouped on the same left edge as the biography. */
+@media (min-width: 601px) and (max-width: 1099px) {
+  .sidebar { grid-template-columns: max-content max-content; justify-content: start; }
+  .profile-contact { justify-self: start; }
+}
