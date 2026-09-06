@@ -18,14 +18,30 @@
   const guide=decoration('cat-drop-guide');guide.hidden=true;
   const hint=decoration('cat-scruff-hint');hint.hidden=true;
   const hole=decoration('cat-return-hole');hole.hidden=true;
+  const portalCanvas=document.createElement('canvas');
+  portalCanvas.className='cat-portal-sparks';portalCanvas.width=portalCanvas.height=200;
+  portalCanvas.ariaHidden='true';portalCanvas.hidden=true;document.body.append(portalCanvas);
+  const portalInk=portalCanvas.getContext?.('2d');
+  const portalBack=document.createElement('canvas');
+  portalBack.className='cat-portal-sparks cat-portal-sparks-back';
+  portalBack.width=portalBack.height=200;portalBack.ariaHidden='true';portalBack.hidden=true;
+  document.body.append(portalBack);
+  const portalBackInk=portalBack.getContext?.('2d');
+  const portalTiming={settle:180,trace:1250,walk:1800,close:320,open:550};
+  const portalExit=portalTiming.settle+portalTiming.trace+portalTiming.walk+portalTiming.close;
   const desktop=matchMedia('(min-width: 1100px)');
   const sx=()=>window.scrollX||0, sy=()=>window.scrollY||0;
   const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
   const smooth=p=>p*p*(3-2*p);
-  const width=()=>canvas.getBoundingClientRect().width;
+  const width=()=>canvas.offsetWidth || canvas.getBoundingClientRect().width;
   const holdDuration=180;
+  const introCard=document.querySelector('.pet-card');
+  const introButton=introCard?.querySelector?.('.pet-toggle');
+  let introStarted=null;
   let portalWanted=true;
+  let nextWanderAt=performance.now()+25000;
   let state=null,holdTimer=0,lastTick=0,releasingCapture=false,lastHover=null;
+  let viewportDirty=false,viewportChangedAt=0,lastVisibleBox=null;
   function lineRect(element,edge='top') {
     if(!element?.isConnected)return null;
     const r=element.getBoundingClientRect();
@@ -49,6 +65,39 @@
     return result;
   }
   const currentLine=item=>item.id==='home'?homeRect():lineRect(item.element,item.edge);
+  function visibleLine(r) {
+    return !!r && r.y-sy()>=width()*.7 && r.y-sy()<=innerHeight-8;
+  }
+  function viewportTarget() {
+    if(sy()<40 && visibleLine(homeRect()))return {id:'home',element:home};
+    return targets().filter(item=>visibleLine(item.rect))
+      .sort((a,b)=>b.rect.y-a.rect.y)[0]||null;
+  }
+  function resident(target) {
+    return target.id==='home'?null:{mode:'parked',target,deadline:Infinity,viewportFollow:true};
+  }
+  function portalTo(target,now,follow=false) {
+    returnHome(now);
+    state.excursion={target,parked:resident(target),fraction:.2+Math.random()*.6};
+    if(follow) {
+      state.viewportTransfer=true;
+      const b=lastVisibleBox||{x:state.from.x-sx(),y:state.from.y-sy()};
+      state.viewportFrom={x:b.x,y:clamp(b.y,width()+16,innerHeight-12)};
+    }
+  }
+  function viewportChanged() {viewportDirty=true;viewportChangedAt=performance.now();}
+  function followViewport(now) {
+    if(!portalWanted||!api.active()||(state&&state.mode!=='parked')||state?.platformMotion)return;
+    const b=canvas.getBoundingClientRect();
+    if(b.bottom>=width()*.7&&b.bottom<=innerHeight-8)lastVisibleBox={x:b.left,y:b.bottom};
+    if(!viewportDirty||now-viewportChangedAt<100||api.interacting?.(now))return;
+    const target=viewportTarget();if(!target)return;
+    viewportDirty=false;
+    const current=state?.target||{id:'home',element:home};
+    if(current.element===target.element)return;
+    portalTo(target,now,true);
+  }
+
   function nearbyControl(point) {
     const buttons=['theme-toggle','language-toggle'].map(id=>document.getElementById(id)).filter(Boolean);
     const nearest=buttons.map(control=>{const r=control.getBoundingClientRect();return {control,r,
@@ -81,15 +130,16 @@
     const w=width();externalBox(r.left,r.y-w*.7,r.width,w*.7);canvas.style.removeProperty('bottom');
   }
   function floatCat(left,bottom,kind,frame=0,progress=0,distance=0,facing=1) {
-    const w=width(),h=kind==='carried'?w:w*.7;
+    const w=width(),h=kind==='carried'||kind==='portal-open'?w:w*.7;
     externalBox(left,bottom-h,w,h);canvas.style.bottom='0';canvas.style.transform=`scaleX(${facing})`;
     api.render(kind,frame,progress,distance,facing);
   }
   function clearDecorations() {
-    guide.hidden=hint.hidden=hole.hidden=true;
+    guide.hidden=hint.hidden=hole.hidden=portalCanvas.hidden=portalBack.hidden=true;
     canvas.style.pointerEvents='auto';
     document.documentElement.classList.remove('cat-carrying','cat-handling');
     canvas.style.removeProperty('clip-path');canvas.style.removeProperty('opacity');
+    canvas.style.removeProperty('transform-origin');
   }
   function restoreHome(x=null,facing=api.direction()) {
     clearDecorations();reserveLine(null);homeVacant(false);
@@ -104,10 +154,12 @@
     releasingCapture=false;
   }
   function cancel() {
+    const wasIntro=state?.mode==='intro';
     clearTimeout(holdTimer);holdTimer=0;
     if(!state){clearDecorations();return;}
     restorePrank(state);
     const id=state.pointerId;state=null;releaseCapture(id);restoreHome();
+    if(wasIntro){introCard.dispatchEvent(new Event('catintrocancel'));if(introCard.dataset.pinned!=='true')api.hide();}
     if(!portalWanted)api.hide();
   }
   function restoreOrigin(held) {
@@ -115,7 +167,7 @@
     const previous=held.previous;
     if(previous?.mode==='parked') {
       const r=currentLine(previous.target);
-      if(r){reserveLine(previous.target);homeVacant(true);state={...previous,deadline:performance.now()+10000};setLine(r);api.resume(clamp(held.from.left-r.left,0,r.width-width()),held.facing);return;}
+      if(r){reserveLine(previous.target);homeVacant(true);state={...previous,interacting:false,returnDelay:5000,deadline:previous.viewportFollow?Infinity:performance.now()+5000};setLine(r);api.resume(clamp(held.from.left-r.left,0,r.width-width()),held.facing);return;}
     }
     state=null;const r=homeRect();restoreHome(r?held.from.left-r.left:null,held.facing);
   }
@@ -125,14 +177,35 @@
     state={mode,start:now,from:{x:r.left+sx(),y:r.bottom+sy()},facing};
     canvas.style.pointerEvents='none';
   }
+  function wander(now=performance.now()) {
+    if(now<nextWanderAt||!portalWanted||api.reduced()||api.interacting?.(now)||
+      (state&&state.mode!=='parked')||state?.platformMotion)return false;
+    const parked=state?{...state}:null,target=parked?.target||{id:'home',element:home};
+    const r=currentLine(target),w=width();if(!r||r.width<w*1.6)return false;
+    const here=canvas.getBoundingClientRect().left+sx()-r.left;
+    const fraction=here>(r.width-w)/2?.12+Math.random()*.18:.7+Math.random()*.18;
+    returnHome(now);
+    state.excursion={target,parked,fraction};
+    nextWanderAt=now+45000;
+    return true;
+  }
+  function finishArrival(r,goalX,now) {
+    const excursion=state?.excursion,elapsed=now-(state?.start||now);
+    if(excursion?.parked) {
+      clearDecorations();reserveLine(excursion.target);homeVacant(true);
+      state={...excursion.parked,deadline:excursion.parked.deadline+elapsed};
+      setLine(r);api.resume(goalX-r.left,1);
+    } else {state=null;restoreHome(goalX-r.left,1);}
+  }
   function finishDrop(now) {
-    const item=state.target,r=currentLine(item),facing=state.facing;
+    viewportDirty=false;
+    const item=state.target,r=currentLine(item),facing=state.facing,returnTarget=state.returnTarget||{id:'home',element:home};
     if(!r){returnHome(now);return;}
     const x=clamp(state.dropX-r.left,0,Math.max(0,r.width-width()));
     clearDecorations();
-    if(item.id==='home'){state=null;restoreHome(x,facing);if(!portalWanted)returnHome(now,'exiting');return;}
+    if(item.id==='home'&&returnTarget.id==='home'){state=null;restoreHome(x,facing);if(!portalWanted)returnHome(now,'exiting');return;}
     // Restore the lane and sprite transform in the same frame: no left-edge flash.
-    state={mode:'parked',target:item,deadline:now+10000};setLine(r);api.resume(x,facing);
+    state={mode:'parked',target:item,returnTarget,deadline:now+10000};setLine(r);api.resume(x,facing);
     if(!portalWanted)returnHome(now,'exiting');
     else if(item.control)beginPrank(item,now);
   }
@@ -146,7 +219,7 @@
     const sprite=canvas.getBoundingClientRect();
     clearDecorations();
     reserveLine(target);homeVacant(target.id!=='home');
-    state={mode:'landing',target,dropX:clamp(sprite.left+sx(),r.left,r.left+r.width-width()),
+    state={mode:'landing',target,returnTarget:held.previous?.target||{id:'home',element:home},dropX:clamp(sprite.left+sx(),r.left,r.left+r.width-width()),
       from:{x:sprite.left+sx(),y:sprite.bottom+sy(),top:sprite.top+sy()},amount:Math.max(0,((held.liftProgress||0)-.35)/.65),start:performance.now(),facing:held.facing};
     api.pause();
     // Moving the cat never opens or closes the content belonging to a separator.
@@ -160,12 +233,13 @@
     }
   }
   function beginPrank(target,now) {
+    const returnTarget=state?.returnTarget;
     const cat=canvas.getBoundingClientRect(),button=target.control.getBoundingClientRect(),w=width();
     const center=button.left+button.width/2+sx(),fromX=cat.left+sx();
     const facing=center>=fromX+w/2?1:-1,goal=center-w*(facing===1?.73:.27);
     const walkFacing=Math.sign(goal-fromX)||facing,oldFacing=api.direction();
     api.pause();
-    state={mode:'prank',target,start:now,fromX,goal,facing,walkFacing,oldFacing,
+    state={mode:'prank',target,returnTarget,start:now,fromX,goal,facing,walkFacing,oldFacing,
       turnIn:api.reduced()||oldFacing===walkFacing?0:240,turnOut:api.reduced()||walkFacing===facing?0:240,
       walkDuration:api.reduced()?0:Math.max(120,Math.abs(goal-fromX)/40*1000),restoreAllowed:true};
     canvas.style.pointerEvents='none';
@@ -196,7 +270,7 @@
     }
     if(action>=2850)restorePrank(prank);
     if(action>=3200){
-      clearDecorations();state={mode:'parked',target:prank.target,deadline:now+10000};
+      clearDecorations();state={mode:'parked',target:prank.target,returnTarget:prank.returnTarget,deadline:now+10000};
       setLine(r);api.resume(clamp(prank.goal-r.left,0,r.width-w),prank.facing);
     }
   }
@@ -204,9 +278,108 @@
   document.addEventListener('click',event=>{
     if(state?.mode==='prank'&&event.isTrusted&&event.target.closest?.('button')===state.target.control)state.restoreAllowed=false;
   },true);
-  function showHole(x,y,openness) {
-    const w=width();hole.hidden=false;
-    Object.assign(hole.style,{left:`${x-sx()}px`,top:`${y-sy()}px`,width:`${w*.4}px`,height:`${w*.74}px`,transform:`translate(-50%,-100%) scaleX(${Math.max(.001,openness)})`});
+  // Deterministic, bounded particles: motion comes from tangential velocity,
+  // cooling and gravity. Batched strokes keep the dense spark shower inexpensive.
+  const portalNoise=n=>{const v=Math.sin(n*127.1+311.7)*43758.5453;return v-Math.floor(v);};
+  const portalSparks=Array.from({length:760},(_,i)=>({
+    theta:portalNoise(i+1)*Math.PI*2,offset:portalNoise(i+1001),
+    life:.18+portalNoise(i+2001)*.35,speed:40+portalNoise(i+3001)*85,
+    outward:5+portalNoise(i+4001)*32,radius:47.5+portalNoise(i+5001)*4,
+    trail:.018+portalNoise(i+6001)*.045+(i%13===0?.045:0),tint:i%3
+  }));
+  function paintPortal(progress,seconds,fade=1,startAngle=-Math.PI/2,traceFacing=1) {
+    const ink=portalInk;if(!ink?.arc)return;
+    ink.clearRect(0,0,200,200);if(progress<=0||fade<=0)return;
+    const full=Math.PI*2,angle=startAngle,end=angle+full*progress,spin=seconds*3.8;
+    const groups=Array.from({length:12},()=>[]);
+    ink.save();if(traceFacing<0){ink.translate(200,0);ink.scale(-1,1);}ink.lineCap='round';
+    if(ink.createRadialGradient) {
+      const aura=ink.createRadialGradient(100,100,39,100,100,76);
+      aura.addColorStop(0,'#ff9b2000');aura.addColorStop(.33,'#ff8a231c');aura.addColorStop(1,'#ff6c1400');
+      ink.fillStyle=aura;ink.globalAlpha=fade*progress;
+      ink.fillRect(20,20,160,160);
+    }
+    // Hundreds of short, irregular filaments form the rim. There is no solid
+    // neon outline underneath them; the luminous contour is made of moving sparks.
+    ink.globalCompositeOperation='lighter';ink.shadowColor='#ffad47';ink.shadowBlur=2.5;
+    for(let layer=0;layer<3;layer++) {
+      ink.beginPath();
+      for(let i=0;i<100;i++) {
+        const seed=i+layer*101,a=((i/100*full+spin+portalNoise(seed)*.065)%full+full)%full;
+        if(a>full*progress)continue;
+        const r=47.5+portalNoise(seed+701)*6+Math.sin(a*3-spin)*.75;
+        const length=.04+portalNoise(seed+902)*.25;
+        ink.moveTo(100+Math.cos(a+angle)*r,100+Math.sin(a+angle)*r);
+        ink.arc(100,100,r,a+angle,angle+Math.min(full*progress,a+length));
+      }
+      ink.strokeStyle=['#ff8225','#ffd077','#fff2c2'][layer];
+      ink.globalAlpha=[.28,.55,.7][layer]*fade;
+      ink.lineWidth=[2.7,1.15,.65][layer];ink.stroke();
+    }
+    ink.shadowBlur=0;
+    for(let i=0;i<portalSparks.length;i++) {
+      const spark=portalSparks[i],age=(seconds+spark.offset*spark.life)%spark.life,born=seconds-age;
+      if(born<0)continue;
+      // The tracing tip throws sparks until the circle closes. Afterwards the
+      // entire rim continuously emits, with three broad rotating concentrations.
+      const a=progress<.999?end-age*6:angle+spark.theta+born*3.8;
+      if(progress<.999&&a<angle)continue;
+      const heat=.45+.55*((Math.cos((a-angle-spin)*3)+1)/2)**3;
+      const velocity=spark.speed*(.7+heat*.45);
+      const dx=-Math.sin(a)*velocity+Math.cos(a)*spark.outward;
+      const dy=Math.cos(a)*velocity+Math.sin(a)*spark.outward;
+      const at=t=>[100+Math.cos(a)*spark.radius+dx*t,100+Math.sin(a)*spark.radius+dy*t+38*t*t];
+      const head=at(age),tail=at(Math.max(0,age-spark.trail));
+      const alpha=(1-age/spark.life)**.6*heat;
+      const band=Math.min(3,Math.floor(alpha*4));
+      groups[band*3+spark.tint].push([tail[0],tail[1],head[0],head[1]]);
+    }
+    for(let g=0;g<groups.length;g++) {
+      ink.beginPath();for(const [x,y,tx,ty] of groups[g]){ink.moveTo(x,y);ink.lineTo(tx,ty);}
+      ink.strokeStyle=['#ff8729','#ffd58b','#fff4ce'][g%3];
+      ink.globalAlpha=(.16+Math.floor(g/3)*.21)*fade;
+      ink.lineWidth=g%3===2?.7:1.05;ink.stroke();
+    }
+    if(progress<1) {
+      ink.globalAlpha=fade;ink.fillStyle='#fff5c9';
+      ink.beginPath();ink.arc(100+49*Math.cos(end),100+49*Math.sin(end),2,0,full);ink.fill();
+    }
+    ink.restore();
+  }
+  function showHole(x,y,progress,seconds=0,fade=1,frontRight=true,startAngle=-Math.PI/2,traceFacing=1,size=1) {
+    const w=width()*size;hole.hidden=false;
+    Object.assign(hole.style,{left:`${x-sx()}px`,top:`${y-sy()}px`,width:`${w*.5}px`,height:`${w*.92}px`,transform:'translate(-50%,-100%)'});
+    hole.style.setProperty?.('--cat-portal-aperture',String(smooth(clamp((progress-.35)/.65,0,1))*fade));
+    portalCanvas.hidden=false;
+    Object.assign(portalCanvas.style,{left:`${x-sx()-w*.5}px`,top:`${y-sy()-w*1.38}px`,width:`${w}px`,height:`${w*1.84}px`});
+    paintPortal(progress,seconds,fade,startAngle,traceFacing);
+    // Split one rendered ring into complementary near/far halves. The cat
+    // crosses BETWEEN them: never behind the entire halo on its way out.
+    portalBack.hidden=false;
+    Object.assign(portalBack.style,{left:portalCanvas.style.left,top:portalCanvas.style.top,
+      width:portalCanvas.style.width,height:portalCanvas.style.height});
+    portalCanvas.style.clipPath=frontRight?'inset(0 0 0 50%)':'inset(0 50% 0 0)';
+    portalBack.style.clipPath=frontRight?'inset(0 50% 0 0)':'inset(0 0 0 50%)';
+    if(portalBackInk?.drawImage) {
+      portalBackInk.clearRect(0,0,200,200);
+      portalBackInk.drawImage(portalCanvas,0,0);
+    }
+  }
+  function portalOcclusion(left,feet,holeX,holeY,facing,emerging=false) {
+    const w=width(),cx=(facing===1?(holeX-left)/w:1-(holeX-left)/w)*40;
+    const cy=((holeY-feet)/w+.24)*40,rx=10,ry=18.4;
+    // Follow the curved rear lip of the aperture, not a vertical clipping plane.
+    // Body size and stride stay unchanged throughout the crossing.
+    const points=[];
+    for(let y=0;y<=28;y++) {
+      const arc=rx*Math.sqrt(Math.max(0,1-((y-cy)/ry)**2));
+      const edge=cx+(emerging?-arc:arc);
+      points.push(`${edge/40*100}% ${y/28*100}%`);
+    }
+    canvas.style.clipPath=emerging
+      ?`polygon(100% 0,${points.join(',')},100% 100%)`
+      :`polygon(0 0,${points.join(',')},0 100%)`;
+    canvas.style.opacity='1';
   }
   function finishHidden() {
     state=null;restoreHome();api.hide();
@@ -214,15 +387,33 @@
   function appear() {
     portalWanted=true;
     restoreHome();api.pause();
-    state={mode:'entering',start:performance.now()};
+    if(introCard?.dataset.intro==='pending' && introStarted!==introCard.dataset.introSequence && introButton) {
+      introStarted=introCard.dataset.introSequence;
+      if(!api.reduced()) {
+        state={mode:'intro',start:performance.now()};
+        canvas.style.pointerEvents='none';tickIntro(state.start);return;
+      }
+      introCard.dispatchEvent(new Event('catintroenable'));
+    }
+    state={mode:'entering',start:performance.now(),entryFraction:Math.random()};
+    if(!visibleLine(homeRect())) {
+      const target=viewportTarget();
+      if(target){state.excursion={target,parked:resident(target)};state.viewportTransfer=true;}
+    }
     canvas.style.pointerEvents='none';
     // Establish the clipped first frame before the browser can paint the sprite.
     tickPortal(state.start);
   }
   function setVisible(wanted) {
     portalWanted=wanted;
-    if(wanted)return; // An exit already underway finishes before the latest reopening.
-    if(state&&['entering','exiting','returning','landing'].includes(state.mode))return;
+    if(wanted) {
+      // If a hover preview is still active at the restart deadline, leave through
+      // its portal before beginning the new header entrance.
+      if(introCard?.dataset.intro==='pending' && introStarted!==introCard.dataset.introSequence &&
+        (!state || state.mode==='parked')) returnHome(performance.now(),'exiting');
+      return;
+    } // An exit already underway finishes before the latest reopening.
+    if(state&&['intro','entering','exiting','returning','landing'].includes(state.mode))return;
     if(state?.mode==='dragging'){release({pointerId:state.pointerId},true);return;}
     if(state?.mode==='arming') {
       const held=state;clearTimeout(holdTimer);holdTimer=0;
@@ -231,47 +422,123 @@
     restorePrank(state);
     returnHome(performance.now(),'exiting');
   }
+  function tickIntro(now) {
+    const intro=state,w=width(),button=introButton.getBoundingClientRect();
+    const goal=button.left+button.width/2+sx()-w*.9;
+    const floor=Math.max(button.bottom+w*.22,w*.96)+sy();
+    const holeX=goal-w*.45,holeY=floor-w*.025;
+    const elapsed=Math.max(0,now-intro.start);
+    const open=550,out=1800,tap=700,turn=200,back=1800,close=320;
+    const tapAt=open+out,turnAt=tapAt+tap,backAt=turnAt+turn,end=backAt+back;
+    const fade=1-clamp((elapsed-end)/close,0,1);
+    // Right-facing emergence and left-facing retreat share the same near lip.
+    // Turning the cat must not swap the physical front/back halves of the door.
+    showHole(holeX,holeY,clamp(elapsed/open,0,1),elapsed/1000,fade,false);
+    canvas.style.removeProperty('clip-path');canvas.style.opacity='1';
+    if(elapsed<tapAt) {
+      const p=smooth(clamp((elapsed-open)/out,0,1)),x=goal-w*1.4*(1-p);
+      floatCat(x,floor,'walk',0,0,56*p,1);
+      portalOcclusion(x,floor,holeX,holeY,1,true);
+      if(p===0)canvas.style.opacity='0';
+    } else if(elapsed<turnAt) {
+      const action=(elapsed-tapAt)/tap;
+      floatCat(goal,floor,'button-tap',0,action,0,1);
+    } else if(elapsed<backAt) {
+      const p=(elapsed-turnAt)/turn;
+      floatCat(goal,floor,'turn',0,p,0,p<.5?1:-1);
+    } else {
+      const p=smooth(clamp((elapsed-backAt)/back,0,1)),x=goal-w*1.4*p;
+      floatCat(x,floor,'walk',0,0,56*p,-1);
+      portalOcclusion(x,floor,holeX,holeY,-1);
+      if(p===1)canvas.style.opacity='0';
+    }
+    // This event only enables a pending intro; it never toggles a human choice.
+    if(elapsed>=tapAt+350&&!intro.pressed) {
+      intro.pressed=true;
+      introCard.dispatchEvent(new Event('catintroenable'));
+    }
+    if(elapsed>=end+close) {
+      clearDecorations();
+      if(portalWanted)appear();else finishHidden();
+    }
+  }
   function tickPortal(now) {
-    const r=homeRect();if(!r){cancel();return;}
-    const w=width(),goalX=r.left+Math.max(0,(r.width-w)/2),goalY=r.y+w*.025;
-    if(api.reduced()){if(!portalWanted){finishHidden();return;}state=null;restoreHome(goalX-r.left,1);api.presented();return;}
-    const elapsed=Math.max(0,now-state.start)+(state.mode==='entering'?1000:0);
-    // The full cat enters a hole at its nose before changing locations out of sight.
-    if(elapsed<1000) {
-      const p=clamp((elapsed-180)/650,0,1),f=state.facing;
+    if(state.viewportFrom)state.from={x:state.viewportFrom.x+sx(),y:state.viewportFrom.y+sy()};
+    // While fully inside a gate, follow the latest visible destination safely.
+    if(state.viewportTransfer && now-state.start<(state.mode==='entering'?portalTiming.open:portalExit+portalTiming.open) &&
+      !visibleLine(state.excursion?currentLine(state.excursion.target):homeRect())) {
+      const target=viewportTarget();
+      if(target)state.excursion={target,parked:resident(target),fraction:state.excursion?.fraction??.5};
+    }
+    let r=state.excursion?currentLine(state.excursion.target):homeRect();
+    if(!r&&state.excursion){delete state.excursion;r=homeRect();}
+    if(!r){cancel();return;}
+    const w=width(),available=Math.max(0,r.width-w);
+    // Keep a sampled entry location stable throughout the animation and resizing.
+    // The portal sits to the left of the arriving cat, so it needs more room there.
+    const leftMargin=Math.min(w*.62,available/2),rightMargin=Math.min(w*.12,available/4);
+    const offset=state.entryFraction===undefined
+      ?available*(state.excursion?.fraction??.5)
+      :leftMargin+(available-leftMargin-rightMargin)*state.entryFraction;
+    const goalX=r.left+offset,goalY=r.y+w*.025;
+    if(api.reduced()){if(!portalWanted){finishHidden();return;}finishArrival(r,goalX,now);api.presented();return;}
+    const elapsed=Math.max(0,now-state.start)+(state.mode==='entering'?portalExit:0);
+    // Settle, trace a circle with one paw, then walk through the completed ring.
+    if(elapsed<portalExit) {
+      const trace=clamp((elapsed-portalTiming.settle)/portalTiming.trace,0,1);
+      const walking=elapsed-portalTiming.settle-portalTiming.trace;
+      const p=clamp(walking/portalTiming.walk,0,1),f=state.facing;
+      const gesture=api.portalGesture?.(trace)||{circle:clamp((trace-.24)/.54,0,1),size:1,centerX:39.2,bottom:-1};
       const holeX=state.from.x+w*(f===1?.98:.02);
-      const left=state.from.x+f*w*smooth(p);
-      const opening=Math.min(clamp(elapsed/180,0,1),1-clamp((elapsed-830)/170,0,1));
-      showHole(holeX,state.from.y-w*.025,smooth(opening));
-      if(elapsed<180){
-        externalBox(left,state.from.y-w*.7,w,w*.7);canvas.style.bottom='0';canvas.style.transform=`scaleX(${f})`;api.settle(elapsed/180);
-      }else floatCat(left,state.from.y,p>0?'sprint':'idle',0,0,40*smooth(p),f);
-      const hidden=clamp(f===1?1-(holeX-left)/w:(holeX-left)/w,0,1)*100;
-      // Clip paths follow canvas coordinates, which are mirrored for left-facing cats.
-      canvas.style.clipPath=`inset(0 ${hidden}% 0 0)`;
-      canvas.style.opacity=elapsed>=830?'0':'1';
+      const left=state.from.x+f*w*1.4*smooth(p),feet=state.from.y;
+      const fade=1-clamp((walking-portalTiming.walk)/portalTiming.close,0,1);
+      const drawingX=state.from.x+w*(f===1?gesture.centerX/40:1-gesture.centerX/40);
+      showHole(drawingX,state.from.y+w*gesture.bottom/40,gesture.circle,Math.max(0,elapsed-portalTiming.settle)/1000,fade,f===1,Math.PI/2,f,gesture.size);
+      if(elapsed<portalTiming.settle){
+        externalBox(left,state.from.y-w*.7,w,w*.7);canvas.style.bottom='0';canvas.style.transform=`scaleX(${f})`;api.settle(elapsed/portalTiming.settle);
+      }else if(walking<0)floatCat(left,state.from.y,'portal-open',0,trace,0,f);
+      else floatCat(left,feet,p>0?'walk':'idle',0,0,56*smooth(p),f);
+      if(walking<0){canvas.style.removeProperty('clip-path');portalBack.hidden=true;portalCanvas.style.clipPath='none';}
+      else portalOcclusion(left,feet,holeX,state.from.y-w*.025,f);
+      canvas.style.opacity=p>=1?'0':'1';
       return;
     }
-    if(state.mode==='exiting' && elapsed>=1000){
+    if(state.mode==='exiting'){
       if(portalWanted)appear();else finishHidden();
       return;
     }
-    if(state.mode==='returning' && elapsed>=1000 && !portalWanted && !state.homeReserved){finishHidden();return;}
-    if(!state.homeReserved){reserveLine(null);homeVacant(false);state.homeReserved=true;}
-    const enter=elapsed-1000,p=clamp((enter-180)/650,0,1),holeX=goalX;
-    const left=holeX-w+w*smooth(p);
-    const opening=Math.min(clamp(enter/180,0,1),1-clamp((enter-830)/170,0,1));
-    showHole(holeX,r.y,smooth(opening));
-    floatCat(left,goalY,p<1?'sprint':'idle',0,0,40*smooth(p),1);
-    canvas.style.clipPath=`inset(0 0 0 ${clamp((holeX-left)/w,0,1)*100}%)`;
-    canvas.style.opacity='1';
-    if(enter>=1000){
-      state=null;restoreHome(goalX-r.left,1);
+    if(state.mode==='returning' && !portalWanted && !state.homeReserved){finishHidden();return;}
+    if(!state.homeReserved){if(!state.excursion?.parked){reserveLine(null);homeVacant(false);}state.homeReserved=true;}
+    const enter=elapsed-portalExit,holeX=goalX-w*.12;
+    // Sample once per arrival. Neither a new frame nor a resize changes its mood.
+    if(!state.arrival)state.arrival={walk:3000+Math.random()*400,
+      pause:Math.random()<.45?1500+Math.random()*500:0};
+    if(state.arrival.segmented===undefined)state.arrival.segmented=state.arrival.pause>0;
+    const arrival=state.arrival,approach=arrival.walk*.62,afterOpen=Math.max(0,enter-portalTiming.open);
+    // Closing cancels optional dawdling, while preserving the travelled distance.
+    if(!portalWanted)arrival.pause=Math.min(arrival.pause,Math.max(0,afterOpen-approach));
+    const grooming=arrival.pause>0&&afterOpen>=approach&&afterOpen<approach+arrival.pause;
+    let along;
+    if(!arrival.segmented)along=smooth(clamp(afterOpen/arrival.walk,0,1));
+    else if(afterOpen<approach)along=.62*smooth(clamp(afterOpen/approach,0,1));
+    else if(grooming)along=.62;
+    else along=.62+.38*smooth(clamp((afterOpen-approach-arrival.pause)/(arrival.walk-approach),0,1));
+    const left=goalX-w*1.4*(1-along),finished=portalTiming.open+arrival.walk+arrival.pause;
+    const opening=clamp(enter/portalTiming.open,0,1),fade=1-clamp((enter-finished)/portalTiming.close,0,1);
+    showHole(holeX,r.y,opening,enter/1000,fade,false);
+    const lickTime=grooming?afterOpen-approach:0;
+    floatCat(left,goalY,grooming?'groom':along<1?'walk':'idle',Math.floor(lickTime/75),
+      grooming?lickTime/arrival.pause:0,56*along,1);
+    portalOcclusion(left,goalY,holeX,r.y,1,true);
+    if(along===0)canvas.style.opacity='0';
+    if(enter>=finished+portalTiming.close){
+      finishArrival(r,goalX,now);
       if(!portalWanted)returnHome(now,'exiting');else api.presented();
     }
   }
   function tick(now) {
     const dt=Math.min(.05,Math.max(0,(now-lastTick)/1000));lastTick=now;
+    followViewport(now);
     if(!state){
       if(!hint.hidden&&lastHover){if(api.hitScruff(lastHover))showHint(api.scruffPoint());else hint.hidden=true;}
       return false;
@@ -304,7 +571,21 @@
     }
     if(state.mode==='parked') {
       const r=currentLine(state.target);
-      if(!r||now>=state.deadline){returnHome(now);return true;}
+      if(!r){returnHome(now);return true;}
+      // Human interaction takes precedence, even on the frame the old timer expires.
+      if(api.interacting?.(now)) {
+        state.interacting=true;
+        state.returnDelay=5000;
+        state.deadline=Infinity;
+      } else if(state.interacting) {
+        state.interacting=false;
+        state.deadline=state.viewportFollow?Infinity:now+5000;
+      }
+      const returnTarget=state.returnTarget||{id:'home',element:home};
+      if(!state.viewportFollow&&now>=state.deadline&&visibleLine(r)&&visibleLine(currentLine(returnTarget))){
+        if(returnTarget.id==='home')returnHome(now);else portalTo(returnTarget,now);
+        return true;
+      }
       setLine(r);
       if(state.platformMotion) {
         const motion=state.platformMotion,elapsed=now-motion.start;
@@ -314,16 +595,17 @@
           return true;
         }
         delete state.platformMotion;
-        state.deadline=now+10000;
+        state.deadline=state.interacting||state.viewportFollow?Infinity:now+(state.returnDelay||10000);
         if(motion.moved)api.platformLanded(motion.expanded);
       }
       return false;
     }
+    if(state.mode==='intro'){tickIntro(now);return true;}
     if(state.mode==='prank'){tickPrank(now);return true;}
     if(['returning','entering','exiting'].includes(state.mode)){tickPortal(now);return true;}
     return false;
   }
-  api.install({tick,cancel,appear,setVisible,isAway:()=>!!state,blocksInput:()=>!!state&&(state.mode!=='parked'||!!state.platformMotion)});
+  api.install({tick,cancel,appear,setVisible,wander,viewportChanged,isAway:()=>!!state,blocksInput:()=>!!state&&(state.mode!=='parked'||!!state.platformMotion)});
   function followSectionMotion(event) {
     if(state?.mode!=='parked')return;
     const source=event.target;
@@ -334,7 +616,7 @@
     state.platformFacing=api.direction();api.pause();
     state.platformMotion={start:performance.now(),duration:event.detail.duration,
       expanded:event.detail.expanded,fromY:r.y,moved:existing?.moved||false};
-    state.deadline=performance.now()+event.detail.duration+10000;
+    state.deadline=performance.now()+event.detail.duration+(state.returnDelay||10000);
   }
   document.addEventListener('sectionmotionstart',followSectionMotion);
   document.querySelector('.background-details')?.addEventListener('backgroundmotionstart',followSectionMotion);
@@ -374,6 +656,7 @@
     if(event.pointerType==='mouse'&&!event.buttons&&api.hitScruff(event))showHint(api.scruffPoint());else hint.hidden=true;
   },{passive:true});
   document.addEventListener('keydown',event=>{if(event.key==='Escape'&&state){event.preventDefault();event.stopImmediatePropagation();cancel();}},true);
+  window.addEventListener('scroll',viewportChanged,{passive:true});
   window.addEventListener('blur',cancel);
   desktop.addEventListener('change',cancel);
 })();

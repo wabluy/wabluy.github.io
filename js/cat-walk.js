@@ -72,6 +72,7 @@
   let tailStarted = null;
   let walkAway = null;
   let cursorPoint = null;
+  let lastInteractionMove = -Infinity;
   let featherFollowing = false;
   let followTime = 0;
   let tailRoot = { x: 11, y: 21 };
@@ -118,11 +119,12 @@
     ctx.fillRect(Math.round(x), Math.round(y), width, height);
   }
 
+  let rasterTop = 0;
   // Integer scan lines keep every contour a hand-drawn pixel edge.
   function polygon(points, ink) {
     ctx.fillStyle = ink;
     if (!points.flat().every(Number.isFinite)) return;
-    const low = Math.max(0, Math.floor(Math.min(...points.map(point => point[1]))));
+    const low = Math.max(rasterTop, Math.floor(Math.min(...points.map(point => point[1]))));
     const high = Math.min(canvas.height, Math.ceil(Math.max(...points.map(point => point[1]))));
     for (let y = low; y < high; y++) {
       const crossings = [];
@@ -651,6 +653,39 @@
     drawWalk(distance);
   }
 
+  function portalGesture(progress) {
+    const clip=t=>Math.max(0,Math.min(1,t)),ease=t=>t*t*(3-2*t);
+    const circle=clip((progress-.24)/.54),theta=Math.PI/2+2*Math.PI*circle;
+    const expand=ease(clip((progress-.78)/.22));
+    return {circle,x:0,lift:0,paw:[32+5*Math.cos(theta),13+9.2*Math.sin(theta)],
+      upright:ease(clip(progress/.24))*(1-ease(clip((progress-.78)/.22))),
+      size:.5+.5*expand,centerX:32+7.2*expand,bottom:-5.8+4.8*expand};
+  }
+  function drawPortalOpen(frame,progress) {
+    ctx.save();const previousRasterTop=rasterTop;
+    if(canvas.height===40){ctx.translate(0,12);rasterTop=-12;}
+    const gesture=portalGesture(progress),rise=gesture.upright*actionWeight;
+    // Rear paws remain planted. The hips support an upright chest while one
+    // foreleg traces the circle; the torso never orbits the aperture.
+    poseTail([[12,22],[8,24],[4,23],[3,19],[4,16]],rise);
+    groundLeg(mixPoint([11,20],[13,22],rise),[11,26],true,4);
+    const farShoulder=mixPoint([23,20],[22,13],rise);
+    frontLeg(farShoulder,mixPoint(gaitFoot(23,0,.75),[24,18],rise),true);
+    poseBody([[9,22],[11,18],[16,15],[18,10],[22,8],[26,10],[27,15],[24,21],[22,25],[13,26],[9,24]],
+      [[10,22],[12,19],[17,16],[19,11],[22,9],[25,11],[26,15],[23,21],[21,24],[13,25],[10,24]],
+      [[19,12],[23,11],[25,14],[23,20],[20,23],[16,23],[17,19]],rise);
+    groundLeg(mixPoint([13,20],[17,23],rise),[15,26],false,4.5);
+    head(-6*rise,-5*rise,'normal');
+    const shoulder=mixPoint([28,20],[26,13],rise);
+    const paw=mixPoint(gaitFoot(28,0,.25),gesture.paw,rise);
+    const dx=paw[0]-shoulder[0],dy=paw[1]-shoulder[1],distance=Math.hypot(dx,dy)||1;
+    const bone=3+(6.2-3)*rise,bend=Math.sqrt(Math.max(0,bone*bone-distance*distance/4));
+    const elbow=[(shoulder[0]+paw[0])/2-dy/distance*bend,(shoulder[1]+paw[1])/2+dx/distance*bend];
+    line([shoulder,elbow,paw],color.outline,3);
+    line([shoulder,elbow,paw],color.orange,2);
+    rect(paw[0]-1,paw[1]-1,3,2,color.cream);pawEdge(paw[0]-1,paw[1]);
+    rasterTop=previousRasterTop;ctx.restore();
+  }
   function drawPlay(frame, progress, singleTap = false) {
     const smooth = value => { const t = Math.max(0, Math.min(1, value)); return t * t * (3 - 2 * t); };
     const upright = smooth(progress / .17) * (1 - smooth((progress - .82) / .18)) * actionWeight;
@@ -678,10 +713,11 @@
     const foreleg = (far) => {
       // Shoulder attachment follows the same torso transform throughout the rise.
       const shoulder = [mix(far ? 25 : 30, far ? 24 : 25), mix(22,18)];
-      const upper = angle(far ? 3 : 1), lower = angle(far ? 4 : 2);
+      const upper = angle(far ? 3 : 1);
+      const lower = angle(far ? 4 : 2);
       const reach = mix(2, 2.8);
-      const elbow = [shoulder[0] + reach * Math.cos(upper), shoulder[1] + reach * Math.sin(upper)];
-      const paw = [elbow[0] + reach * Math.cos(lower), elbow[1] + reach * Math.sin(lower)];
+      let elbow = [shoulder[0] + reach * Math.cos(upper), shoulder[1] + reach * Math.sin(upper)];
+      let paw = [elbow[0] + reach * Math.cos(lower), elbow[1] + reach * Math.sin(lower)];
       // Slim forelegs avoid the heavy block that previously covered the entire chest.
       line([shoulder, elbow, paw], color.outline, 3);
       line([shoulder, elbow, paw], far ? color.stripe : color.orange, 2);
@@ -690,7 +726,7 @@
     };
     const morph = (standing,seated) => mixContour(standing,seated,upright);
     tail(0, Math.round(Math.sin(progress * Math.PI * (singleTap ? 1 : 4)) * upright));
-    limb([[14, 23], [14, 25], [14, 26]], true);
+    limb([[14,23],[14,25],[14,26]],true);
     polygon(morph(
       [[6.5,17],[8.5,14],[11.8,11.7],[16,11.7],[19,13],[23,11],[26,14],[28,17],[28,20],[25,23],[21,22],[19,23.3],[17,24],[15,24],[13,23.3],[11,22.4],[7.5,22.4],[5.5,20]],
       [[10,20],[13,16],[18,12],[23,10],[26,13],[26,19],[25,23],[23,25],[12,25],[9,23],[8,21]]), color.outline);
@@ -700,7 +736,7 @@
     polygon([[mix(13,17),21],[mix(23,24),mix(20,14)],[mix(27,25),21],[mix(25,23),24],[13,24],[11,23]], color.cream);
     rect(13, mix(14,19), 2, 3, color.stripe);
     rect(18, mix(13,15), 2, 3, color.stripe);
-    limb([[16, 23], [16, 25], [16, 26]]);
+    limb([[16,23],[16,25],[16,26]]);
     head(-Math.round(4 * upright), -Math.round(3 * upright), upright>.2?'aim':'normal', upright);
     foreleg(true);
     foreleg(false);
@@ -713,6 +749,7 @@
     else if (kind === 'falling') drawFalling(progress);
     else if (kind === 'grab') drawPlay(frame, progress);
     else if (kind === 'button-tap') drawPlay(frame, progress, true);
+    else if (kind === 'portal-open') drawPortalOpen(frame, progress);
     else if (kind === 'pounce') drawPounce(progress, frame);
     else if (kind === 'tail-enjoy') drawTailEnjoy(progress);
     else if (kind === 'pet') drawPet(progress);
@@ -730,7 +767,7 @@
     else if(kind==='walk')drawSprint(gaitDistance,gaitBlend);
     else drawWalk(gaitDistance);
   }
-  const restingActions=new Set(['button-tap','stretch','scratch','groom','belly-groom','sploot','belly','pet','tail-enjoy','grab','pounce','yawn','scared']);
+  const restingActions=new Set(['portal-open','button-tap','stretch','scratch','groom','belly-groom','sploot','belly','pet','tail-enjoy','grab','pounce','yawn','scared']);
   function drawExit(source,progress) {
     actionWeight=(source.exitWeight??1)*(1-easePose(progress));
     postureOverride=(easePose(source.progress/.16)*(1-easePose((source.progress-.84)/.16)))*actionWeight;
@@ -814,7 +851,7 @@
   function raiseLane() {
     if (transportDriver?.isAway() || !desktopLane.matches || reducedMotion.matches || pet.dataset.dismissed === 'true') return;
     if (!active) activate();
-    if (!active) return;
+    if (!active || transportDriver?.isAway()) return;
     const photo = document.querySelector('.pet-portrait').getBoundingClientRect();
     const contact = document.querySelector('.profile-contact').getBoundingClientRect();
     const floor = stage.getBoundingClientRect().bottom + laneOffset;
@@ -834,8 +871,9 @@
   }
 
   function lowerLane() {
-    if (transportDriver?.isAway() || pet.dataset.dismissed === 'true') return;
-    if (!laneMotion || !desktopLane.matches) return;
+    if (transportDriver?.isAway() || !desktopLane.matches) return;
+    if (!laneMotion && !laneOffset && !catLift) return;
+    poseHandoff = null;
     laneMotion = { kind: 'falling', start: performance.now(), from: laneOffset, catFrom: catLift };
     stage.dataset.lane = 'falling';
     lastPaint = -Infinity;
@@ -961,6 +999,7 @@
     chargePointer = null;
     walkAway = null;
     cursorPoint = null;
+    lastInteractionMove = -Infinity;
     featherFollowing = false;
     clearCursor();
     stroke = null;
@@ -979,6 +1018,13 @@
     if (document.hidden || !stage.isConnected || !pet.isConnected) { stop(); return; }
     if (transportDriver?.tick(now)) { if (active && !frameRequest) frameRequest = requestAnimationFrame(tick); return; }
     if (reducedMotion.matches) { if (transportDriver?.isAway()) frameRequest = requestAnimationFrame(tick); return; }
+    // Reconcile after transport yields control as well as on hover events. An
+    // event received during entry/drag must never leave a raised, empty lane.
+    if (desktopLane.matches) {
+      const raised = laneMotion && ['rising', 'raised'].includes(laneMotion.kind);
+      if (pet.dataset.open === 'true' && !raised) raiseLane();
+      else if (pet.dataset.open !== 'true' && raised) lowerLane();
+    }
     if (tickPoseHandoff(now)) { frameRequest=requestAnimationFrame(tick);return; }
     if (tickLane(now)) { if (active) frameRequest = requestAnimationFrame(tick); return; }
     if (tickTurn(now)) { frameRequest = requestAnimationFrame(tick); return; }
@@ -1087,6 +1133,13 @@
         if (phaseTime < phase.duration) break;
         phaseTime -= phase.duration;
       }
+      if(phase.kind==='portal-hop') {
+        phase.kind='idle'; // One attempt per stop, including when interaction blocks it.
+        if(pet.dataset.pinned==='true' && transportDriver?.wander?.(now)) {
+          if(!frameRequest)frameRequest=requestAnimationFrame(tick);
+          return;
+        }
+      }
       const progress = Math.min(1, phaseTime / phase.duration);
       const moveProgress = travelProgress(progress, phase.kind === 'sprint' ? .14 : .08);
       const along = phase.from + (phase.to - phase.from) * moveProgress;
@@ -1102,7 +1155,7 @@
     if (active) { transportDriver?.setVisible(true); return; }
     if (document.hidden || !stage.isConnected) return;
     const bounds = stage.getBoundingClientRect();
-    if (!bounds.width || !bounds.height || bounds.bottom < 0 || bounds.top > innerHeight) return;
+    if ((!bounds.width || !bounds.height || bounds.bottom < 0 || bounds.top > innerHeight) && pet.dataset.intro!=='pending') return;
     active = true;
     measure();
     stage.classList.add('is-active');
@@ -1149,7 +1202,7 @@
     }
     for (let i = 0; i < stopCount; i++) {
       walkTo(startPosition + (1 - startPosition) * (i + between(.65, 1.25)) / (stopCount + 1));
-      const choices = ['belly', 'sploot', 'yawn', 'scratch', 'stretch', 'groom', 'belly-groom'].filter(kind => kind !== previousAction);
+      const choices = ['belly', 'sploot', 'yawn', 'scratch', 'stretch', 'groom', 'belly-groom', 'portal-hop'].filter(kind => kind !== previousAction);
       const kind = choices[Math.floor(Math.random() * choices.length)];
       const duration = kind === 'stretch' ? between(3000, 3500) : (kind === 'groom' || kind === 'belly-groom') ? between(2400, 3000) : kind === 'belly' ? between(2600, 3400)
         : kind === 'sploot' ? between(2100, 3200) : between(1800, 2800);
@@ -1328,6 +1381,7 @@
   document.addEventListener('pointermove', event => {
     if (transportDriver?.blocksInput()) return;
     if (!active || event.pointerType !== 'mouse') { clearCursor(); return; }
+    const previousPoint = cursorPoint;
     cursorPoint = { clientX: event.clientX, clientY: event.clientY };
     if (!featherToy.hidden) {
       featherToy.style.left = `${event.clientX - 22}px`;
@@ -1337,6 +1391,11 @@
     if (!point) return;
     const now = performance.now();
     let zone = cursorZone(point);
+    // Count nearby human movement, not an idle cursor or autonomous walking.
+    if (zone && (zone !== 'front' || featherWithinReach(event)) &&
+        (!previousPoint || Math.hypot(event.clientX-previousPoint.clientX,event.clientY-previousPoint.clientY)>=1)) {
+      lastInteractionMove = now;
+    }
     if (stroke && now - stroke.lastTime < 180 && zone !== stroke.zone &&
         Math.hypot(event.clientX - stroke.x, event.clientY - stroke.y) < 18) zone = stroke.zone;
     showCursor(zone);
@@ -1411,6 +1470,8 @@
     hide: stop,
     presented() { if(pet.dataset.open==='true')raiseLane(); },
     active: () => active,
+    interacting: (now = performance.now()) => active && (pounceHeld || pendingInput !== null ||
+      playStarted !== null || petStarted !== null || tailStarted !== null || now-lastInteractionMove < 200),
     direction: () => turnMotion && turnMotion.progress < .5 ? turnMotion.from : direction,
     reduced: () => reducedMotion.matches,
     hitScruff(event) {
@@ -1466,10 +1527,12 @@
       resetLane();turnMotion=null;playStarted=petStarted=tailStarted=null;
       pendingInput=walkAway=null;pounceHeld=false;chargePointer=null;
       featherFollowing=false;cursorPoint=null;stroke=null;clearCursor();treat.hidden=true;
+      lastInteractionMove=-Infinity;
       if (active && !frameRequest) frameRequest=requestAnimationFrame(tick);
     },
+    portalGesture,
     render(kind,frame=0,progress=0,distance=0,facing=direction) {
-      const height = kind === 'carried' ? 40 : 28;
+      const height = kind === 'carried' || kind === 'portal-open' ? 40 : 28;
       if (canvas.height !== height) { canvas.height=height;ctx.imageSmoothingEnabled=false; }
       if (height === 40) canvas.style.height=`${canvas.getBoundingClientRect().width}px`;
       else canvas.style.removeProperty('height');
@@ -1523,7 +1586,7 @@
   }
   if ('IntersectionObserver' in window) {
     new IntersectionObserver(entries => {
-      if (!entries[0].isIntersecting && !transportDriver?.isAway()) stop();
+      if (!entries[0].isIntersecting && active && transportDriver) transportDriver.viewportChanged();
       else if (pet.dataset.interacting === 'true') activate();
     }).observe(stage);
   }

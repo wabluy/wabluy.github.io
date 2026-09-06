@@ -178,7 +178,10 @@ function createHoverPreview(root, trigger, media) {
 const petCard = document.querySelector('.pet-card');
 const compactProfile = window.matchMedia('(width < 1100px)');
 const petButton = petCard.querySelector('.pet-toggle');
-let catPinned = true;
+let catPinned = false;
+petCard.dataset.intro = 'pending';
+petCard.dataset.introSequence = '1';
+let catRestartTimer = 0;
 let catHovered = false;
 let catPreviewSuppressed = false;
 let catHandledPointerClick = false;
@@ -191,7 +194,7 @@ const isCatControl = control => control === petButton;
 const catControl = () => activeCatControl || petButton;
 function updateCatInteraction() {
   const preview = !catPreviewSuppressed && (catHovered || catPointer !== null || (compactProfile.matches && catFocused));
-  const active = preview || catPinned;
+  const active = preview || catPinned || petCard.dataset.intro === 'pending';
   petCard.dataset.open = String(preview);
   petCard.dataset.pinned = String(catPinned);
   petButton.setAttribute('aria-pressed', String(catPinned));
@@ -216,9 +219,39 @@ function closeCatInteraction() {
   activeCatControl = null;
   updateCatInteraction();
 }
+function scheduleCatRestart() {
+  clearTimeout(catRestartTimer);
+  catRestartTimer = 0;
+  if (catPinned) return;
+  catRestartTimer = setTimeout(() => {
+    catRestartTimer = 0;
+    if (catPinned) return;
+    petCard.dataset.intro = 'pending';
+    petCard.dataset.introSequence = String(Number(petCard.dataset.introSequence) + 1);
+    updateCatInteraction();
+    petCard.dispatchEvent(new Event('catpreviewstart'));
+  }, 10000);
+}
+function cancelCatIntro() {
+  if (petCard.dataset.intro === 'pending') petCard.dataset.intro = 'cancelled';
+}
+petCard.addEventListener('catintroenable', () => {
+  if (petCard.dataset.intro !== 'pending') return;
+  petCard.dataset.intro = 'complete';
+  catPinned = true;
+  scheduleCatRestart();
+  updateCatInteraction();
+});
+petCard.addEventListener('catintrocancel', () => {
+  cancelCatIntro();
+  scheduleCatRestart();
+  updateCatInteraction();
+});
 petButton.addEventListener('click', event => {
+  cancelCatIntro();
   if (catHandledPointerClick) { catHandledPointerClick = false; if (event.detail !== 0) return; }
   catPinned = !catPinned;
+  scheduleCatRestart();
   catPreviewSuppressed = true;
   updateCatInteraction();
   if (catPinned) petCard.dispatchEvent(new Event('catpreviewstart'));
@@ -237,6 +270,7 @@ for (const control of [petButton]) {
   });
   control.addEventListener('pointerdown', event => {
     if (!isCatControl(control) || event.button !== 0) return;
+    cancelCatIntro();
     activeCatControl = control;
     catPointer = event.pointerId;
     catFocused = false;
@@ -251,11 +285,16 @@ for (const control of [petButton]) {
     catFocused = catPointer === null && !catHovered && control.matches(':focus-visible');
     updateCatInteraction();
   });
-  control.addEventListener('blur', closeCatInteraction);
+  control.addEventListener('blur', () => {
+    // Keyboard focus and pointer hover have independent lifetimes.
+    catFocused = false;
+    updateCatInteraction();
+  });
 }
 document.addEventListener('pointerup', event => {
   if (event.pointerId !== catPointer) return;
   catPinned = !catPinned;
+  scheduleCatRestart();
   catHandledPointerClick = true;
   catPreviewSuppressed = true;
   catPointer = null;
@@ -277,7 +316,7 @@ document.addEventListener('pointerdown', event => {
   if (!petCard.contains(event.target) && !petButton.contains(event.target)) closeCatInteraction();
 });
 document.addEventListener('keydown', event => {
-  if (event.key === 'Escape') { catPinned = false; closeCatInteraction(); }
+  if (event.key === 'Escape') { cancelCatIntro(); catPinned = false; scheduleCatRestart(); closeCatInteraction(); }
 });
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) closeCatInteraction();

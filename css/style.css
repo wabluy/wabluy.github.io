@@ -1,3 +1,4 @@
+@font-face { font-family: "Dr Bo Title"; src: url("../assets/fonts/cinzel/dr-bo.ttf") format("truetype"); font-weight: 600; font-style: normal; font-display: swap; }
 :root {
   color-scheme: dark;
   --bg: #181818;
@@ -7,9 +8,9 @@
   --muted: #a1a1a1;
   --accent: #9470c2;
   --accent-hover: #9470c2;
-  --pet-purple: #a78bfa;
-  --pet-highlight: #f2f0f7;
-  --pet-gray: #a1a1a1;
+  --pet-gold: #dba74f;
+  --pet-highlight: #fff0bc;
+  --pet-shadow: #a66d29;
   --line: #303030;
   --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --mono: SFMono-Regular, Consolas, 'Liberation Mono', monospace;
@@ -32,9 +33,9 @@
   --muted: #6b6b6b;
   --accent: #654091;
   --accent-hover: #654091;
-  --pet-purple: #704bb5;
-  --pet-highlight: #55515e;
-  --pet-gray: #727078;
+  --pet-gold: #996419;
+  --pet-highlight: #bf862a;
+  --pet-shadow: #76501e;
   --line: #d8d8d6;
 }
 * { box-sizing: border-box; }
@@ -82,14 +83,16 @@ nav:has(a:hover) a:not(:hover)::after { opacity: 0; }
 .pet-toggle:hover { color: var(--body); }
 .pet-toggle[aria-pressed='true'], .pet-toggle[data-pressing='true'] { color: #c58049; }
 .pet-toggle svg { width: 18px; height: 18px; }
-.pet-portrait { position: fixed; top: auto; right: calc(16px + env(safe-area-inset-right, 0px)); left: auto; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 5; width: 160px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); box-shadow: 0 12px 32px rgb(0 0 0 / .24); text-align: center; visibility: hidden; opacity: 0; pointer-events: none; }
-.pet-card[data-open='true'] .pet-portrait { visibility: visible; opacity: 1; }
+.pet-portrait { position: fixed; top: auto; right: calc(16px + env(safe-area-inset-right, 0px)); left: auto; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 5; width: 160px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); box-shadow: 0 12px 32px rgb(0 0 0 / .24); text-align: center; visibility: hidden; opacity: 0; pointer-events: none; transition: opacity 200ms cubic-bezier(.4, 0, .2, 1), visibility 0s linear 200ms; }
+.pet-card[data-open='true'] .pet-portrait { visibility: visible; opacity: 1; transition: opacity 360ms cubic-bezier(.4, 0, .2, 1), visibility 0s; }
 .pet-photo { display: block; width: 92px; height: 92px; overflow: hidden; border-radius: 50%; border: 1px solid var(--line); margin: 0 auto 8px; }
 .pet-photo img { display: block; width: 100%; height: 100%; object-fit: cover; transform: scale(1.6); transform-origin: 60% 68%; }
 .pet-name { color: var(--body); font-size: var(--type-meta); line-height: 1.7; }
-.pet-role { display: block; color: var(--pet-purple); font: var(--type-meta)/1.8 var(--mono); white-space: nowrap; }
+.pet-title { display: block; margin: 4px 0 2px; font: 600 1.2rem/1.35 "Dr Bo Title", Georgia, serif; letter-spacing: .06em; color: var(--pet-gold); }
+.pet-role { display: block; color: var(--pet-gold); font: var(--type-meta)/1.8 var(--mono); white-space: nowrap; }
 @supports ((background-clip: text) or (-webkit-background-clip: text)) {
-  .pet-role { width: fit-content; margin-inline: auto; background-image: linear-gradient(90deg, var(--pet-highlight), var(--pet-gray) 20%, var(--pet-purple) 50%, var(--pet-gray) 80%, var(--pet-highlight)); background-size: 200% 100%; background-clip: text; -webkit-background-clip: text; color: transparent; animation: pet-color-flow 8s linear infinite; }
+  .pet-title { background: linear-gradient(180deg, var(--pet-highlight) 10%, var(--pet-gold) 44%, var(--pet-shadow) 55%, var(--pet-highlight) 82%); background-clip: text; -webkit-background-clip: text; color: transparent; }
+  .pet-role { width: fit-content; margin-inline: auto; background-image: linear-gradient(90deg, var(--pet-highlight), var(--pet-shadow) 20%, var(--pet-gold) 50%, var(--pet-shadow) 80%, var(--pet-highlight)); background-size: 200% 100%; background-clip: text; -webkit-background-clip: text; color: transparent; animation: pet-color-flow 8s linear infinite; }
 }
 @keyframes pet-color-flow {
   from { background-position: 0% 50%; }
@@ -171,8 +174,21 @@ footer { display: flex; align-items: center; justify-content: flex-end; gap: 16p
   .background-details > p { margin-top: 12px; }
   .background-details[data-expanded='false'] > summary > span[aria-hidden='true'] { transform: none; }
   .header-actions > .pet-card { display: block; }
-  .pet-portrait { border: 0; background: transparent; box-shadow: none; }
-  .pet-portrait .pet-photo { border: 0; }
+  .pet-portrait {
+    border: 0; background: transparent; box-shadow: none;
+    transition: opacity 200ms cubic-bezier(.4, 0, .2, 1), visibility 0s linear 200ms;
+  }
+  .pet-card[data-open='true'] .pet-portrait {
+    transition: opacity 360ms cubic-bezier(.4, 0, .2, 1), visibility 0s;
+  }
+  .pet-portrait .pet-photo {
+    border: 0; filter: blur(1.2px);
+    transition: filter 200ms cubic-bezier(.4, 0, .2, 1);
+  }
+  .pet-card[data-open='true'] .pet-photo {
+    filter: blur(0);
+    transition-duration: 360ms;
+  }
   .topbar-inner { max-width: 856px; padding: 0 28px; }
   nav { gap: 24px; }
   nav a { padding: 18px 0; }
@@ -226,7 +242,7 @@ footer { display: flex; align-items: center; justify-content: flex-end; gap: 16p
   .pet-role { animation: none; background-position: 50% 50%; }
 }
 @media (forced-colors: active) {
-  .pet-role { background: none; color: CanvasText; animation: none; }
+  .pet-title, .pet-role { background: none; color: CanvasText; animation: none; }
 }
 @media print {
   :root { --bg: #fff; --text: #111; --body: #333; --muted: #555; --accent: #542b8c; --line: #ddd; }

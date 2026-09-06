@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 180">
+  <defs>
+    <linearGradient id="space" x2="0" y2="1"><stop stop-color="#10131b"/><stop offset=".62" stop-color="#25242b"/><stop offset="1" stop-color="#11151b"/></linearGradient>
+    <radialGradient id="distance" cx=".53" cy=".48" r=".5"><stop stop-color="#b79666" stop-opacity=".44"/><stop offset=".32" stop-color="#79664e" stop-opacity=".21"/><stop offset="1" stop-color="#131721" stop-opacity="0"/></radialGradient>
+    <linearGradient id="floor" x2="0" y2="1"><stop stop-color="#51483a"/><stop offset=".3" stop-color="#353235"/><stop offset="1" stop-color="#14191f"/></linearGradient>
+    <linearGradient id="left" x2="1" y2="0"><stop stop-color="#0c1017"/><stop offset="1" stop-color="#353138"/></linearGradient>
+    <linearGradient id="right" x2="1" y2="0"><stop stop-color="#383138"/><stop offset="1" stop-color="#0d1118"/></linearGradient>
+    <linearGradient id="light" x2="0" y2="1"><stop stop-color="#c7ae7e" stop-opacity=".42"/><stop offset="1" stop-color="#967b55" stop-opacity="0"/></linearGradient>
+    <radialGradient id="edge"><stop offset=".46" stop-color="#060a10" stop-opacity="0"/><stop offset="1" stop-color="#060a10" stop-opacity=".75"/></radialGradient>
+  </defs>
+  <path fill="url(#space)" d="M0 0h120v180H0z"/>
+  <path fill="url(#floor)" d="m52 108 19 0 49 72H0z"/>
+  <path fill="url(#left)" d="M0 0 49 70 52 108 0 180z"/>
+  <path fill="url(#right)" d="m120 0-46 69-3 39 49 72z"/>
+  <!-- Receding stone reveals converge on a small, distant opening. -->
+  <g fill="none" stroke-linejoin="round">
+    <path stroke="#44404a" stroke-width="3" opacity=".45" d="M18 157V43Q60-6 102 43v114"/>
+    <path stroke="#55505a" stroke-width="2" opacity=".38" d="M34 134V62Q61 29 87 62v72"/>
+    <path stroke="#64565a" stroke-width="1.5" opacity=".4" d="M45 119V75Q61 53 77 75v44"/>
+    <path stroke="#706050" stroke-width="1" opacity=".45" d="M52 108V83Q62 69 71 83v25"/>
+  </g>
+  <path fill="#0f141b" d="M55 108V85q7-10 13 0v23z"/>
+  <path fill="#ac956e" opacity=".43" d="M65 82h2v26h-2z"/>
+  <path fill="url(#light)" d="m62 107 5 0 22 67H24z"/>
+  <g stroke="#878078" stroke-width=".7" opacity=".15">
+    <path d="m60 109-29 71m5-61h52m-65 17h78M9 158h101m-47-49 26 71"/>
+  </g>
+  <path fill="url(#distance)" d="M0 0h120v180H0z"/>
+  <path fill="url(#edge)" d="M0 0h120v180H0z"/>
+</svg>
