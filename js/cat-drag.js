@@ -336,7 +336,7 @@
     const walkFacing=Math.sign(goal-fromX)||facing,oldFacing=api.direction();
     api.pause();
     state={mode:'prank',target,returnTarget,start:now,fromX,goal,facing,walkFacing,oldFacing,
-      turnIn:api.reduced()||oldFacing===walkFacing?0:240,turnOut:api.reduced()||walkFacing===facing?0:240,
+      turnIn:api.reduced()||oldFacing===walkFacing?0:(api.turnDuration?.()||720),turnOut:api.reduced()||walkFacing===facing?0:(api.turnDuration?.()||720),
       walkDuration:api.reduced()?0:Math.max(120,Math.abs(goal-fromX)/40*1000),restoreAllowed:true};
     canvas.style.pointerEvents='none';
   }
@@ -526,7 +526,7 @@
     const floor=Math.max(button.bottom+w*.22,w*.96)+sy();
     const holeX=goal-w*.45,holeY=floor-w*.025;
     const elapsed=Math.max(0,now-intro.start);
-    const open=550,out=2400,tap=700,turn=200,back=2400,close=320;
+    const open=550,out=2400,tap=700,turn=api.turnDuration?.()||720,back=2400,close=320;
     const tapAt=open+out,turnAt=tapAt+tap,backAt=turnAt+turn,end=backAt+back;
     const fade=1-clamp((elapsed-end)/close,0,1);
     // Right-facing emergence and left-facing retreat share the same near lip.

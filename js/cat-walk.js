@@ -87,34 +87,56 @@
   let tailStarted = null;
   let walkAway = null;
   let cursorPoint = null;
-  let gazePoint=null,gazeLast=0,gazeX=0,gazeY=0,gazeTargetX=0,gazeTargetY=0;
+  let gazePoint=null,gazeLast=0,gazeX=0,gazeY=0,gazeTargetX=0,gazeTargetY=0,gazeFocus=0;
+  let gazeHistory=[],gazeSample=null;
+  function trackGazePoint(point,now=performance.now()) {
+    gazePoint=point;
+    if(!point){gazeHistory=[];gazeSample=null;return;}
+    const last=gazeHistory[gazeHistory.length-1];
+    // Coalesce high-rate mice to one sample per display frame. Preserve time
+    // rather than restarting a debounce on every move, so a moving hand is followed too.
+    if(last&&now-last.time<16)last.point=point;
+    else gazeHistory.push({time:now,point});
+    if(gazeHistory.length>64)gazeHistory.shift();
+  }
   const gazeKinds=new Set(['idle','walk','sprint','chase']);
   function resetGaze(clearPointer=false) {
-    gazeLast=0;gazeX=gazeY=gazeTargetX=gazeTargetY=0;
+    gazeLast=0;gazeX=gazeY=gazeTargetX=gazeTargetY=gazeFocus=0;
+    gazeHistory=[];gazeSample=null;
     if(clearPointer)gazePoint=null;
     delete stage.dataset.lookDirection;
   }
   function updateGaze(kind) {
     const now=performance.now(),dt=gazeLast?Math.max(0,Math.min(50,now-gazeLast)):16;gazeLast=now;
-    gazeTargetX=gazeTargetY=0;
+    gazeTargetX=gazeTargetY=0;let focusTarget=0;
     const free=active&&gazeKinds.has(kind)&&!turnMotion&&!poseHandoff&&!transportDriver?.blocksInput()&&
       playStarted===null&&petStarted===null&&tailStarted===null&&!featherPress&&!pounceHeld;
     if(free&&gazePoint) {
       const r=canvas.getBoundingClientRect(),cx=r.left+r.width*(direction===1?.75:.25),cy=r.top+r.height*13/spriteHeight;
-      const dx=gazePoint.clientX-cx,dy=gazePoint.clientY-cy;
       // A local ellipse: roughly two cat lengths sideways and one-and-a-half
       // vertically, with a feathered outer edge instead of a global listener effect.
       const rx=Math.max(100,Math.min(155,r.width*2.2)),ry=Math.max(76,Math.min(115,r.width*1.6));
+      const presentRadius=Math.hypot((gazePoint.clientX-cx)/rx,(gazePoint.clientY-cy)/ry);
+      if(presentRadius>=1){gazeHistory=[];gazeSample=null;}
+      else {
+        if(!gazeHistory.length&&!gazeSample)trackGazePoint(gazePoint,now);
+        while(gazeHistory.length&&gazeHistory[0].time<=now-(reducedMotion.matches?0:250))gazeSample=gazeHistory.shift().point;
+      }
+      const dx=gazeSample?gazeSample.clientX-cx:0,dy=gazeSample?gazeSample.clientY-cy:0;
       const radius=Math.hypot(dx/rx,dy/ry),distance=Math.hypot(dx,dy);
       if(radius<1&&distance>5&&r.bottom>0&&r.top<innerHeight) {
         const fade=1-easePose((radius-.76)/.24),near=easePose((distance-5)/24);
         gazeTargetX=dx/distance*direction*fade*near;
         gazeTargetY=-dy/distance*fade*near;
+        const point=pointerOnSprite(gazeSample);
+        if(point&&cursorZone(point)==='front')focusTarget=fade*near;
         stage.dataset.lookDirection=String((Math.atan2(dx,-dy)*180/Math.PI+360)%360);
       }else delete stage.dataset.lookDirection;
     }else delete stage.dataset.lookDirection;
     const amount=reducedMotion.matches?1:1-Math.exp(-dt/85);
     gazeX+=(gazeTargetX-gazeX)*amount;gazeY+=(gazeTargetY-gazeY)*amount;
+    gazeFocus+=(focusTarget-gazeFocus)*(reducedMotion.matches?1:1-Math.exp(-dt/180));
+    if(gazeFocus<.001&&focusTarget===0)gazeFocus=0;
     if(Math.abs(gazeX)<.001&&gazeTargetX===0)gazeX=0;
     if(Math.abs(gazeY)<.001&&gazeTargetY===0)gazeY=0;
   }
@@ -130,7 +152,7 @@
   let direction = 1;
   let turnMotion = null;
   let transportDriver = null;
-  const turnDuration = 240;
+  const turnDuration = 720;
   let lastPose=null, liftOrigin=null, poseHandoff=null, postureOverride=null;
   let actionWeight=1,gaitBlend=0,gaitPaintAt=0;
   const easePose=t=>{t=Math.max(0,Math.min(1,t));return t*t*(3-2*t);};
@@ -286,7 +308,7 @@
     // Preserve the approved face pixel-for-pixel. Looking changes only the
     // head's placement and the eyes' attention, never their shape or markings.
     ctx.save();
-    ctx.translate(.75*gazeX,-1.1*gazeY);
+    ctx.translate(.75*gazeX,-.8*gazeY);
     ctx.translate(25,22);ctx.rotate(gazeX*(.045+.035*gazeY));ctx.translate(-25,-22);
     const turn = ([x, y]) => [25 + (x - 25) * Math.cos(tilt) - (y - 22) * Math.sin(tilt),
       22 + (x - 25) * Math.sin(tilt) + (y - 22) * Math.cos(tilt)];
@@ -302,8 +324,8 @@
       .map(turn).map(([x, y]) => [matrix.a * x + matrix.c * y + matrix.e, matrix.b * x + matrix.d * y + matrix.f]);
     headRegion = { left: Math.min(...corners.map(p => p[0])), right: Math.max(...corners.map(p => p[0])),
       top: Math.min(...corners.map(p => p[1])), bottom: Math.max(...corners.map(p => p[1])) };
-    // Oversized British Shorthair cheeks, small rounded ears, and an orange-white blaze.
-    polygon(shift([[21, 10], [22, 7], [22, 4], [23, 3], [25, 3], [28, 6], [32, 6], [35, 3], [37, 3], [38, 4], [38, 8], [40, 11], [40, 18], [38, 21], [35, 23], [25, 23], [21, 21], [19, 18], [19, 13]]), color.outline);
+    // British Shorthair cheeks, modest pointed ear tips, and an orange-white blaze.
+    polygon(shift([[21, 10], [22, 7], [22, 4], [23, 3], [24, 2], [25, 3], [28, 6], [32, 6], [35, 3], [36, 2], [37, 3], [38, 4], [38, 8], [40, 11], [40, 18], [38, 21], [35, 23], [25, 23], [21, 21], [19, 18], [19, 13]]), color.outline);
     polygon(shift([[22, 10], [23, 8], [23, 5], [25, 5], [27, 8], [33, 8], [36, 5], [37, 5], [37, 9], [39, 12], [39, 17], [37, 20], [34, 22], [25, 22], [22, 20], [20, 17], [20, 13]]), color.orange);
     box(23 + dx, 6 + dy, 2, 2, color.pink);
     box(35 + dx, 6 + dy, 2, 2, color.pink);
@@ -326,12 +348,15 @@
       const pupil = expression === 'aim' && mouth > .35 ? 5 : 3;
       ctx.save();ctx.translate(.65*gazeX,-.5*gazeY);
       for (const eyeX of [25, 34]) {
+        const focus=expression==='normal'?1+.1*gazeFocus:1;
+        ctx.save();ctx.translate(eyeX+dx+1.5,14.5+dy);ctx.scale(focus,focus);ctx.translate(-eyeX-dx-1.5,-14.5-dy);
         if (pupil === 5) {
           // Rounded pixel pupil: narrow top/bottom rows and fuller middle rows.
           box(eyeX + dx, 12 + dy, 3, 5, color.eye);
           box(eyeX - 1 + dx, 13 + dy, 5, 3, color.eye);
         } else box(eyeX + dx, 13 + dy, 3, 3, color.eye);
         box(eyeX + dx, 13 + dy, 1, 1, color.cream);
+        ctx.restore();
       }
       ctx.restore();
     } else {
@@ -360,9 +385,11 @@
       }
     }
     if (!(expression === 'yawn' && mouth > 0)) {
-      // Two tiny cheek curves meet beneath the nose in a soft pixel W.
-      inkLine([[29 + dx, 18 + dy], [30 + dx, 19 + dy], [31 + dx, 18 + dy],
-        [32 + dx, 19 + dy], [33 + dx, 18 + dy]], color.outline);
+      // Join the two small lobes along their lower edges. Diagonal-only pixels
+      // looked like five detached dots after downsampling to the actual cat size.
+      inkLine([[29 + dx,18 + dy],[29 + dx,19 + dy],[30 + dx,19 + dy],
+        [31 + dx,18 + dy],[32 + dx,19 + dy],[33 + dx,19 + dy],[33 + dx,18 + dy]],color.outline);
+      box(31 + dx,18 + dy,1,1,color.outline);
     }
     ctx.restore();
   }
@@ -591,27 +618,27 @@
   }
 
   function drawTurn(progress) {
-    const smooth = t => { t = Math.max(0, Math.min(1, t)); return t * t * (3 - 2 * t); };
-    const half = progress < .5 ? progress : 1 - progress;
-    const bodyTurn = smooth(half * 2);
-    const look = smooth(half / .42);
-    const mix = (a, b) => a + (b - a) * bodyTurn;
-    const step = Math.sin(half * Math.PI * 2) * 1.5;
-    // Pass through a broad front-facing stance instead of flattening or flipping the silhouette.
-    const tailPoints = [[11,21],[6,20],[3,17],[3,12],[5,10]].map(([x,y]) => [mix(x,20),y]);
-    line(tailPoints, color.outline, 4);
-    line(tailPoints, color.orange, 2);
-    groundLeg([mix(14,17),21], [mix(14,18),26 - step], true, 4);
-    groundLeg([mix(25,23),21], [mix(25,22),26], true, 4);
-    ctx.save();
-    ctx.translate(20,0);
-    ctx.scale(1 - .18 * bodyTurn,1);
-    ctx.translate(-20 + 2 * bodyTurn,0);
-    body();
-    ctx.restore();
-    groundLeg([mix(16,17),22], [mix(16,16),26], false, 4);
-    groundLeg([mix(27,23),22], [mix(27,24),26 - step], false, 4);
-    head(-10 * look, .4 * bodyTurn);
+    // Two small planted steps, through a symmetric front-facing silhouette.
+    // The head leads the shoulders; the hips follow instead of snapping a side sprite.
+    const half=progress<.5?progress:1-progress;
+    const amount=easePose(half*2),look=easePose(half/.43);
+    const mix=(a,b)=>a+(b-a)*amount;
+    const step=(offset)=>Math.sin(Math.PI*Math.max(0,Math.min(1,(half*2-offset)/.7)))**2*1.2;
+    const roots=[[11,20],[23,20],[13,20],[28,20]],centers=[[17,21],[23,21],[16,21],[24,21]];
+    const starts=[gaitFoot(11,0,.5),gaitFoot(23,0,.75),gaitFoot(13,0,0),gaitFoot(28,0,.25)];
+    const goals=[[18,26],[22,26],[16,26],[24,26]];
+    const feet=starts.map((foot,i)=>{const target=mixPoint(foot,goals[i],amount);target[1]-=step(i%2?.2:0);return target;});
+    const leg=i=>{const root=mixPoint(roots[i],centers[i],amount);if(i%2)frontLeg(root,feet[i],i<2);else groundLeg(root,feet[i],i<2,4);};
+    poseTail([[20,21],[20,20],[20,17],[20,12],[20,10]],amount);
+    leg(0);leg(1);
+    poseBody([[12,17],[13,14],[16,12],[20,11],[24,12],[27,14],[28,17],[28,22],[25,24],[15,24],[12,22]],
+      [[13,17],[14,15],[17,13],[20,12],[23,13],[26,15],[27,17],[27,21],[24,23],[16,23],[13,21]],
+      [[16,19],[20,18],[24,19],[25,21],[23,23],[17,23],[15,21]],amount);
+    leg(2);leg(3);
+    // Cover the shoulder seams in the same order as the normal standing pose.
+    polygon([[24,20],[28,20],[29,21],[28,22],[26,23],[24,22]].map(([x,y])=>[mix(x,20),y]),color.orange);
+    polygon([[25,20],[28,20],[28,21],[26,22],[25,21]].map(([x,y])=>[mix(x,20),y]),color.cream);
+    head(-10*look,-1+.6*amount);
   }
 
   function requestTurn(nextDirection, now = performance.now()) {
@@ -839,8 +866,8 @@
   }
   const restingActions=new Set(['portal-open','button-tap','stretch','scratch','groom','belly-groom','sploot','belly','pet','tail-enjoy','grab','pounce','yawn','scared']);
   function drawExit(source,progress) {
-    const previousGaze=[gazeX,gazeY];
-    if(source.gaze){const weight=1-easePose(progress);gazeX=source.gaze[0]*weight;gazeY=source.gaze[1]*weight;}
+    const previousGaze=[gazeX,gazeY,gazeFocus];
+    if(source.gaze){const weight=1-easePose(progress);gazeX=source.gaze[0]*weight;gazeY=source.gaze[1]*weight;gazeFocus=(source.gaze[2]||0)*weight;}
     try {
     if(progress>=1){actionWeight=1;postureOverride=null;drawWalk(0);return;}
     actionWeight=(source.exitWeight??1)*(1-easePose(progress));
@@ -852,7 +879,7 @@
     } else if(source.kind==='idle')drawWalk(0);
     else drawAction(source.kind,source.frame,source.progress);
     actionWeight=1;postureOverride=null;
-    } finally {[gazeX,gazeY]=previousGaze;}
+    } finally {[gazeX,gazeY,gazeFocus]=previousGaze;}
   }
   function tickPoseHandoff(now) {
     if(!poseHandoff)return false;
@@ -896,10 +923,11 @@
     stage.dataset.action = kind;
     updateGaze(kind);
     drawAction(kind,frame,progress);
-    lastPose={kind,frame,progress,distance:gaitDistance,gaitBlend,gaze:[gazeX,gazeY]};
+    lastPose={kind,frame,progress,distance:gaitDistance,gaitBlend,gaze:[gazeX,gazeY,gazeFocus]};
     if (cursorPoint && active) {
       const point = pointerOnSprite(cursorPoint);
-      showCursor(point ? cursorZone(point) : null);
+      const overControl=cursorPoint.target?.closest?.('a, button, summary, input, textarea, select, [contenteditable]');
+      showCursor(point&&!overControl ? cursorZone(point) : null);
     }
   }
 
@@ -1319,10 +1347,10 @@
     }
     for (let i = 0; i < stopCount; i++) {
       walkTo(startPosition + (1 - startPosition) * (i + between(.65, 1.25)) / (stopCount + 1));
-      const choices = ['belly', 'sploot', 'yawn', 'scratch', 'stretch', 'groom', 'belly-groom', 'portal-hop'].filter(kind => kind !== previousAction);
+      const choices = ['belly', 'yawn', 'scratch', 'stretch', 'groom', 'belly-groom', 'portal-hop'].filter(kind => kind !== previousAction);
       const kind = choices[Math.floor(Math.random() * choices.length)];
       const duration = kind === 'stretch' ? between(3000, 3500) : (kind === 'groom' || kind === 'belly-groom') ? between(2400, 3000) : kind === 'belly' ? between(2600, 3400)
-        : kind === 'sploot' ? between(2100, 3200) : between(1800, 2800);
+        : between(1800, 2800);
       sequence.push({ kind, duration, from: position, to: position, frameMs: between(90, 140) });
       previousAction = kind;
     }
@@ -1357,7 +1385,7 @@
     if (point.x >= headRegion.left - 3 && point.x <= headRegion.right + 3 &&
         point.y >= headRegion.top - 5 && point.y <= headRegion.top + 16) return 'head';
     if (Math.abs(point.x - tailRoot.x) <= 6 && Math.abs(point.y - tailRoot.y) <= 7) return 'tail';
-    if(point.x>=-2&&point.x<=42&&point.y>=0&&point.y<=spriteHeight+2)return 'body';
+    if(point.x>=-5&&point.x<=45&&point.y>=-4&&point.y<=spriteHeight+4)return 'body';
     const lane=stage.getBoundingClientRect();
     const onLane=Number.isFinite(point.clientX)
       ? point.clientX>=lane.left && point.clientX<=lane.left+lane.width
@@ -1503,7 +1531,7 @@
   // No hover pause is needed: latch a brief stroke across small hit-area boundaries.
   document.addEventListener('pointermove', event => {
     if(event.pointerType==='mouse'||(event.pointerType==='pen'&&!event.buttons)){
-      gazePoint=event.buttons?null:{clientX:event.clientX,clientY:event.clientY};
+      trackGazePoint(event.buttons?null:{clientX:event.clientX,clientY:event.clientY});
       if(active&&reducedMotion.matches&&!transportDriver?.blocksInput())paint('idle',0);
     }
     if (transportDriver?.blocksInput()) return;
@@ -1515,7 +1543,7 @@
     }
     if (!active || (event.pointerType !== 'mouse' && !((pounceHeld && event.pointerId===chargePointer)||(featherPress?.charged && event.pointerId===featherPress.pointerId)))) { clearCursor(); return; }
     const previousPoint = cursorPoint;
-    cursorPoint = { clientX: event.clientX, clientY: event.clientY };
+    cursorPoint = { clientX: event.clientX, clientY: event.clientY, target:event.target };
     if (!featherToy.hidden) {
       featherToy.style.left = `${event.clientX - 22}px`;
       featherToy.style.top = `${event.clientY - 9}px`;
@@ -1529,8 +1557,9 @@
         (!previousPoint || Math.hypot(event.clientX-previousPoint.clientX,event.clientY-previousPoint.clientY)>=1)) {
       lastInteractionMove = now;
     }
-    if (stroke && now - stroke.lastTime < 180 && zone !== stroke.zone &&
-        Math.hypot(event.clientX - stroke.x, event.clientY - stroke.y) < 18) zone = stroke.zone;
+    // Never carry a gesture across hand/feather boundaries. A body hit wins in
+    // this same pointer event, including while an animated feather is active.
+    if(event.target?.closest?.('a, button, summary, input, textarea, select, [contenteditable]'))zone=null;
     showCursor(zone);
     if (pounceHeld && zone==='front') {
       faceFeather(event);
@@ -1571,7 +1600,7 @@
   }, { passive: true });
 
   document.addEventListener('pointerdown', event => {
-    gazePoint=null;
+    trackGazePoint(null);
     if (transportDriver?.blocksInput()) return;
     if (!active || reducedMotion.matches || !event.isPrimary || event.button !== 0) return;
     const point = pointerOnSprite(event);
@@ -1616,7 +1645,7 @@
   document.addEventListener('pointercancel', event => releaseCharge(event, true));
   document.addEventListener('contextmenu', event => {if(featherPress||pounceHeld)event.preventDefault();});
   document.addEventListener('pointerout', event => {
-    if (!event.relatedTarget) { gazePoint=null;endFeatherFollow(performance.now()); releaseCharge(null, true); cursorPoint = null; clearCursor(); stroke = null; if(active&&reducedMotion.matches&&!transportDriver?.blocksInput())paint('idle',0); }
+    if (!event.relatedTarget) { trackGazePoint(null);endFeatherFollow(performance.now()); releaseCharge(null, true); cursorPoint = null; clearCursor(); stroke = null; if(active&&reducedMotion.matches&&!transportDriver?.blocksInput())paint('idle',0); }
   });
   window.addEventListener('blur', () => { resetGaze(true);endFeatherFollow(performance.now()); releaseCharge(null, true); cursorPoint = null; clearCursor(); if(active&&reducedMotion.matches&&!transportDriver?.blocksInput())paint('idle',0); });
 
@@ -1646,6 +1675,7 @@
     grounded: () => !laneMotion || !['rising','falling','background','landing'].includes(laneMotion.kind),
     interacting: (now = performance.now()) => active && (featherPress !== null || pounceHeld || pendingInput !== null ||
       playStarted !== null || petStarted !== null || tailStarted !== null || now-lastInteractionMove < 200),
+    turnDuration: () => turnDuration,
     direction: () => turnMotion && turnMotion.progress < .5 ? turnMotion.from : direction,
     reduced: () => reducedMotion.matches,
     tapKind(event) {
