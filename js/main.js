@@ -412,6 +412,8 @@ function updateBackgroundVisibility() {
   backgroundDetails.style.removeProperty('overflow');
 }
 function animateBackground(expanded) {
+  // Decide before opening changes the line geometry. Text follows a real, visible fall only.
+  const catFalls = expanded && document.querySelector('.cat-walk')?.catTransport?.backgroundCanFall?.(backgroundDetails) === true;
   clearBackgroundTextReveal(true);
   const from = backgroundDetails.getBoundingClientRect().height;
   if (backgroundAnimation) { backgroundAnimation.onfinish = null; backgroundAnimation.cancel(); }
@@ -420,10 +422,11 @@ function animateBackground(expanded) {
   backgroundDetails.style.removeProperty('height');
   backgroundDetails.open = expanded;
   const to = backgroundDetails.getBoundingClientRect().height;
-  if (backgroundReducedMotion.matches || Math.abs(from - to) < 1) {
+  if ((expanded && !catFalls) || backgroundReducedMotion.matches || Math.abs(from - to) < 1) {
     clearBackgroundTextReveal();
     backgroundDetails.style.removeProperty('overflow');
     backgroundAnimation = null;
+    backgroundDetails.dispatchEvent(new CustomEvent('backgroundmotionstart', {detail:{from,to,duration:0,expanded}}));
     return;
   }
   // Keep the content available while height animates, including during collapse.

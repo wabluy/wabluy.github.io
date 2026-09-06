@@ -897,6 +897,7 @@
   function beginBackgroundMotion(event) {
     if (transportDriver?.isAway() || desktopLane.matches || reducedMotion.matches) return;
     const {from,to,duration,expanded} = event.detail;
+    if(duration===0){if(laneMotion?.kind==='background'){resetLane();pendingLandingGroom=pendingCompactTension=false;lastPaint=-Infinity;}return;}
     if (!active && pet.dataset.interacting !== 'true') return;
     // Platform motion owns its clock; a prior pose must not delay the DOM animation.
     poseHandoff = null;
@@ -1567,6 +1568,11 @@
       stage.dataset.lane='raised';stage.style.transform=`translate3d(0,${-laneOffset}px,0)`;
     },
     active: () => active,
+    backgroundCanFall(source) {
+      if(!active||desktopLane.matches||reducedMotion.matches)return false;
+      if(transportDriver)return transportDriver.backgroundCanFall?.(source)===true;
+      const r=stage.getBoundingClientRect();return r.bottom>0&&r.top<innerHeight;
+    },
     grounded: () => !laneMotion || !['rising','falling','background','landing'].includes(laneMotion.kind),
     interacting: (now = performance.now()) => active && (featherPress !== null || pounceHeld || pendingInput !== null ||
       playStarted !== null || petStarted !== null || tailStarted !== null || now-lastInteractionMove < 200),

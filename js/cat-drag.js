@@ -760,7 +760,13 @@
     if(layoutFollowUntil)layoutFollowUntil+=delta;scrollResumeAt=0;
     viewportChanged();
   }
-  api.install({tick,cancel,appear,setVisible,wander,viewportChanged,suspend,resumeVisibility,isAway:()=>!!state,blocksInput:()=>!!state&&(state.mode!=='parked'||!!state.platformMotion)});
+  function backgroundCanFall(source) {
+    if(!api.active()||desktop.matches||api.reduced()||protectInteraction(performance.now()))return false;
+    const target=standingTarget();if(!target)return false;
+    const r=currentLine(target),before=source.getBoundingClientRect();
+    return residentVisible(r)&&r.y>=before.bottom+sy()-1;
+  }
+  api.install({tick,cancel,appear,setVisible,wander,viewportChanged,suspend,resumeVisibility,backgroundCanFall,isAway:()=>!!state,blocksInput:()=>!!state&&(state.mode!=='parked'||!!state.platformMotion)});
   function followSectionMotion(event) {
     const now=performance.now();
     const id=sectionIds.find(id=>document.getElementById(id)===event.target);
@@ -773,6 +779,7 @@
     layoutFollowUntil=now+event.detail.duration+150;viewportChanged();
     if(state?.mode!=='parked'||protectInteraction(now))return;
     const source=event.target;
+    if(event.detail.duration===0){const r=currentLine(state.target);if(r)setLine(r);delete state.platformMotion;return;}
     // A section's lower separators move; its own top border stays in place.
     const before=source.getBoundingClientRect(),r=currentLine(state.target);
     if(!r || r.y < before.bottom+sy()-1)return;
