@@ -47,7 +47,9 @@
   }
   const featherToy = document.createElement('img');
   featherToy.className = 'cat-feather-toy';
-  featherToy.src = 'assets/cat-feather-cursor.svg?v=20260906-single-feather';
+  const featherAsset = 'assets/cat-feather-cursor.svg?v=20260906-single-feather';
+  const scriptSrc = document.currentScript?.src;
+  featherToy.src = scriptSrc ? new URL(`../${featherAsset}`, scriptSrc).href : featherAsset;
   featherToy.alt = '';
   featherToy.ariaHidden = 'true';
   featherToy.draggable = false;
@@ -498,14 +500,15 @@
       line([root,knee,paw],color.orange,2);
       rect(paw[0]-1,paw[1]-1,3,2,color.cream);pawEdge(paw[0]-1,paw[1]);
       const groomingDip=dip*(.3+.7*lift);
+      frontLeg([24,21],[27,26]);
       head(-8*groomingDip,2*groomingDip,settle>.25?'content':'normal',0,.4*groomingDip);
       if(lift>.8&&cycle>.65)rect(21,24,2,1,color.pink);
-      frontLeg([24,21],[27,26]);
     } else {
       // Repeated head dips bring the muzzle down onto the foreleg fur.
       frontLeg([24,20],[26,26],true);
-      head(-4*dip,1.5*dip,settle>.25?'content':'normal',0,.32*dip);
       frontLeg([25,21],[29,26-2*settle]);
+      // The lowered cheek covers the shoulder; only the paw meets the muzzle.
+      head(-4*dip,1.5*dip,settle>.25?'content':'normal',0,.32*dip);
       if (settle > .8 && cycle > .65) rect(28, 23, 2, 1, color.pink);
       rect(13, 25, 4, 2, color.cream);pawEdge(13,26,4);
     }
@@ -784,11 +787,12 @@
     body(0,0,0,hip);ctx.restore();
     groundLeg([13+hip*.87,shoulderY],foot(15,-3,-2),false,4);
     frontLeg([28,shoulderY],foot(28,5,-3));
-    head(0,-1+3*crouch,pose.focus*actionWeight>.3?'aim':'normal',pose.focus*actionWeight);
     // Keep the shoulder roots covered by the same chest fur as the standing rig.
     const chest=points=>points.map(([x,y])=>[x,y*(1-.06*crouch)+2.26*crouch]);
     polygon(chest([[24,20],[28,20],[29,21],[28,22],[26,23],[24,22]]),color.orange);
     polygon(chest([[25,20],[28,20],[28,21],[26,22],[25,21]]),color.cream);
+    // Chest fur stays behind the chin as the head lowers into the crouch.
+    head(0,-1+3*crouch,pose.focus*actionWeight>.3?'aim':'normal',pose.focus*actionWeight);
 
   }
 

@@ -12,7 +12,7 @@
   --pet-highlight: #fff0bc;
   --pet-shadow: #a66d29;
   --line: #303030;
-  --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font: 'MiSans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --mono: SFMono-Regular, Consolas, 'Liberation Mono', monospace;
   --type-name: 1.5rem;
   --type-section: 1.25rem;
@@ -253,4 +253,122 @@ footer { display: flex; align-items: center; justify-content: flex-end; gap: 16p
   .profile-photo { width: 72px; height: 72px; margin: 0; }
   .profile-contact { display: flex; gap: 20px; }
   .publication, .work-entry { break-inside: avoid; }
+}
+
+/* Main navigation uses the same family, with restrained emphasis. */
+.topbar nav a { font-weight: 500; }
+
+/* Full-page refinement: shared text, measured hierarchy, quiet technical details. */
+:root {
+  --font: 'MiSans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --text: #dedede;
+  --body: #c1c1c1;
+  --muted: #989898;
+  --line: #2e2e2e;
+  --type-section: 1.125rem;
+  --entry-gap: 28px;
+  --detail-gap: 7px;
+  --intro-text: #d1d1d1;
+  --link-rule: #747474;
+}
+:root[data-theme='light'] {
+  --text: #2d2d2d;
+  --body: #515151;
+  --muted: #6a6a6a;
+  --line: #dadada;
+  --intro-text: #444444;
+  --link-rule: #989898;
+}
+body { font-family: var(--font); }
+.topbar-inner { position: relative; }
+.header-actions { margin-left: auto; }
+.topbar nav a { font-weight: 400; letter-spacing: .005em; }
+.wordmark { font-weight: 500; letter-spacing: -1.2px; }
+.identity h1 { font-weight: 500; letter-spacing: -.025em; }
+.role, .affiliation { line-height: 1.75; }
+.profile-contact svg { opacity: 1; stroke-width: 1.4; }
+.contact-arrow, .resource-link > span[aria-hidden], .publication-reference span[aria-hidden], footer span[aria-hidden] {
+  font: 400 .75rem/1 var(--mono);
+  opacity: .72;
+}
+.header-actions svg { stroke-width: 1.4; }
+.about [data-i18n='intro'] {
+  max-width: 66ch;
+  color: var(--intro-text);
+  font-family: var(--font);
+  font-size: var(--type-body);
+  font-weight: 400;
+  line-height: 1.8;
+  letter-spacing: 0;
+  text-wrap: pretty;
+}
+/* This is deliberately one paragraph; its first sentence has no special styling. */
+.about .background-details { margin-top: 20px; }
+.about .background-details > summary {
+  gap: 14px;
+  min-height: 44px;
+  font-family: var(--mono);
+  font-size: .78125rem;
+  font-weight: 400;
+  letter-spacing: .01em;
+}
+.about .background-details > summary > span[aria-hidden='true'] { font-size: .875rem; }
+.about .background-details > p {
+  font-family: var(--font);
+  font-size: .9375rem;
+  line-height: 1.8;
+  color: var(--body);
+  text-wrap: pretty;
+}
+.about a, .news-list a, .publication-reference a {
+  text-decoration-thickness: 1px;
+  text-decoration-color: var(--link-rule);
+  text-underline-offset: .22em;
+}
+.about a:hover, .news-list a:hover, .publication-reference a:hover { text-decoration-color: currentColor; }
+.section-disclosure > .section-heading { min-height: 64px; padding-block: 18px; }
+.section-heading h2 { font-weight: 500; line-height: 1.4; letter-spacing: -.012em; }
+.section-heading .section-toggle {
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  font-size: .875rem;
+  font-weight: 400;
+}
+.section-body { padding-top: 10px; padding-bottom: 30px; }
+.work-entry h3, .publication h3 { color: var(--text); font-weight: 500; line-height: 1.55; letter-spacing: -.006em; }
+.work-entry > p { line-height: 1.75; text-wrap: pretty; }
+.entry-footer { gap: 4px 18px; font-size: .75rem; line-height: 1.85; padding-top: 2px; }
+.resource-link { gap: 5px; }
+.pub-authors { line-height: 1.8; }
+.pub-authors strong { font-weight: 500; }
+.publication-reference { gap: 6px 16px; padding-top: 2px; font-size: .8125rem; }
+.news-list { gap: 18px; }
+.news-list time { font-size: .75rem; line-height: 1.85; font-variant-numeric: tabular-nums; }
+.news-list li > div { font-size: .9375rem; line-height: 1.8; text-wrap: pretty; }
+footer { padding-block: 22px 28px; font-size: .75rem; }
+:lang(zh-CN) .role,
+:lang(zh-CN) .identity h1,
+:lang(zh-CN) .about,
+:lang(zh-CN) .section-heading h2 { font-family: var(--font); letter-spacing: 0; }
+:lang(zh-CN) .about .background-details > summary { font-family: var(--font); }
+@media (min-width: 601px) and (max-width: 700px) {
+  .topbar nav { gap: 16px; }
+}
+@media (min-width: 601px) {
+  .topbar nav { position: absolute; left: 50%; transform: translateX(-50%); }
+}
+@media (max-width: 600px) {
+  .topbar nav { justify-content: center; }
+  :root { --entry-gap: 24px; }
+  .about [data-i18n='intro'] { font-size: .9375rem; line-height: 1.8; }
+  .about .background-details { margin-top: 16px; }
+  .section-disclosure > .section-heading { min-height: 62px; padding-block: 18px; }
+  .entry-footer { column-gap: 14px; }
+  .news-list { gap: 18px; }
+}
+@media (forced-colors: active) {
+  .about [data-i18n='intro'] { color: CanvasText; }
+  .about a, .news-list a, .publication-reference a { text-decoration-color: LinkText; }
 }
