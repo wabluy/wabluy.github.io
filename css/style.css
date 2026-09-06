@@ -373,8 +373,8 @@ footer { padding-block: 22px 28px; font-size: .75rem; }
   .about a, .news-list a, .publication-reference a { text-decoration-color: LinkText; }
 }
 
-/* Tablet profile stays grouped on the same left edge as the biography. */
+/* Tablet identity and contact details form one centered, compact group. */
 @media (min-width: 601px) and (max-width: 1099px) {
-  .sidebar { grid-template-columns: max-content max-content; justify-content: start; }
+  .sidebar { grid-template-columns: max-content max-content; justify-content: center; }
   .profile-contact { justify-self: start; }
 }
