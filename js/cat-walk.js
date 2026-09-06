@@ -1466,7 +1466,7 @@
     if (transportDriver?.blocksInput()) return;
     if (!active || reducedMotion.matches || !event.isPrimary || event.button !== 0) return;
     const point = pointerOnSprite(event);
-    if (!point || cursorZone(point) !== 'front' || !featherWithinReach(event) || (laneMotion && laneMotion.kind!=='raised') ||
+    if (!point || cursorZone(point) !== 'front' || (laneMotion && laneMotion.kind!=='raised') ||
       event.target?.closest?.('a, button, summary, input, textarea, select, [contenteditable]')) return;
     event.preventDefault?.();
     endFeatherFollow(performance.now());stroke=null;
@@ -1482,7 +1482,7 @@
     if (featherPress && (!event || event.pointerId===featherPress.pointerId)) {
       const press=featherPress;featherPress=null;
       if (!press.charged) {
-        if (!cancelled) startInput('grab',press.event,performance.now());
+        if (!cancelled && featherWithinReach(press.event)) startInput('grab',press.event,performance.now());
         else clearCursor();
         return;
       }

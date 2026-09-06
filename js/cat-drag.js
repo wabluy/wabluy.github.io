@@ -76,7 +76,7 @@
     return !!r && r.y-sy()>=width()*.7 && r.y-sy()<=innerHeight-8;
   }
   function viewportTarget() {
-    if(sy()<40 && visibleLine(homeRect()))return {id:'home',element:home};
+    if(visibleLine(homeRect()))return {id:'home',element:home};
     return targets().filter(item=>visibleLine(item.rect))
       .sort((a,b)=>b.rect.y-a.rect.y)[0]||null;
   }
@@ -560,6 +560,8 @@
   }
   function tick(now) {
     const dt=Math.min(.05,Math.max(0,(now-lastTick)/1000));lastTick=now;
+    // The portrait owns its separator even while the cat is opening the header switch.
+    if(state && desktop.matches)homeRect();
     followViewport(now);
     if(!state){
       if(!hint.hidden&&lastHover){if(api.hitScruff(lastHover))showHint(api.scruffPoint());else hint.hidden=true;}
