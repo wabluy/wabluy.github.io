@@ -5,8 +5,21 @@
   if (!stage || !canvas || !pet) return;
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
-  canvas.width = 40;
-  canvas.height = 28;
+  // Keep the existing 40-unit rig; a finer backing grid lets the face turn
+  // between pixel poses without changing the torso, gait or on-screen size.
+  const rasterScale=ctx.setTransform?3:1;
+  let spriteHeight=28;
+  canvas.width = 40*rasterScale;
+  function setSpriteHeight(height) {
+    spriteHeight=height;canvas.height=height*rasterScale;
+    ctx.setTransform?.(rasterScale,0,0,rasterScale,0,0);
+    ctx.imageSmoothingEnabled=false;
+  }
+  setSpriteHeight(28);
+  function rigTransform() {
+    const m=ctx.getTransform();
+    return Object.fromEntries(['a','b','c','d','e','f'].map(k=>[k,m[k]/rasterScale]));
+  }
   ctx.imageSmoothingEnabled = false;
 
   const color = {
@@ -74,8 +87,40 @@
   let tailStarted = null;
   let walkAway = null;
   let cursorPoint = null;
+  let gazePoint=null,gazeLast=0,gazeX=0,gazeY=0,gazeTargetX=0,gazeTargetY=0;
+  const gazeKinds=new Set(['idle','walk','sprint','chase']);
+  function resetGaze(clearPointer=false) {
+    gazeLast=0;gazeX=gazeY=gazeTargetX=gazeTargetY=0;
+    if(clearPointer)gazePoint=null;
+    delete stage.dataset.lookDirection;
+  }
+  function updateGaze(kind) {
+    const now=performance.now(),dt=gazeLast?Math.max(0,Math.min(50,now-gazeLast)):16;gazeLast=now;
+    gazeTargetX=gazeTargetY=0;
+    const free=active&&gazeKinds.has(kind)&&!turnMotion&&!poseHandoff&&!transportDriver?.blocksInput()&&
+      playStarted===null&&petStarted===null&&tailStarted===null&&!featherPress&&!pounceHeld;
+    if(free&&gazePoint) {
+      const r=canvas.getBoundingClientRect(),cx=r.left+r.width*(direction===1?.75:.25),cy=r.top+r.height*13/spriteHeight;
+      const dx=gazePoint.clientX-cx,dy=gazePoint.clientY-cy;
+      // A local ellipse: roughly two cat lengths sideways and one-and-a-half
+      // vertically, with a feathered outer edge instead of a global listener effect.
+      const rx=Math.max(100,Math.min(155,r.width*2.2)),ry=Math.max(76,Math.min(115,r.width*1.6));
+      const radius=Math.hypot(dx/rx,dy/ry),distance=Math.hypot(dx,dy);
+      if(radius<1&&distance>5&&r.bottom>0&&r.top<innerHeight) {
+        const fade=1-easePose((radius-.76)/.24),near=easePose((distance-5)/24);
+        gazeTargetX=dx/distance*direction*fade*near;
+        gazeTargetY=-dy/distance*fade*near;
+        stage.dataset.lookDirection=String((Math.atan2(dx,-dy)*180/Math.PI+360)%360);
+      }else delete stage.dataset.lookDirection;
+    }else delete stage.dataset.lookDirection;
+    const amount=reducedMotion.matches?1:1-Math.exp(-dt/85);
+    gazeX+=(gazeTargetX-gazeX)*amount;gazeY+=(gazeTargetY-gazeY)*amount;
+    if(Math.abs(gazeX)<.001&&gazeTargetX===0)gazeX=0;
+    if(Math.abs(gazeY)<.001&&gazeTargetY===0)gazeY=0;
+  }
   let lastInteractionMove = -Infinity;
   let featherFollowing = false;
+  let lastFeatherMotion=-Infinity;
   let followTime = 0;
   let tailRoot = { x: 11, y: 21 };
   let petTimer = 0;
@@ -127,7 +172,7 @@
     ctx.fillStyle = ink;
     if (!points.flat().every(Number.isFinite)) return;
     const low = Math.max(rasterTop, Math.floor(Math.min(...points.map(point => point[1]))));
-    const high = Math.min(canvas.height, Math.ceil(Math.max(...points.map(point => point[1]))));
+    const high = Math.min(spriteHeight, Math.ceil(Math.max(...points.map(point => point[1]))));
     for (let y = low; y < high; y++) {
       const crossings = [];
       for (let i = 0; i < points.length; i++) {
@@ -216,7 +261,7 @@
     const points = sitting
       ? [[14, 24], [8, 25], [5, 23], [5 + sway, 20]]
       : [[11, 21 + bob], [6, 20 + bob], [3, 17 + bob], [3, 12 + bob], [5 + sway, 10 + bob]];
-    const matrix = ctx.getTransform();
+    const matrix = rigTransform();
     const [rootX, rootY] = points[0];
     tailRoot = { x: matrix.a * rootX + matrix.c * rootY + matrix.e,
       y: matrix.b * rootX + matrix.d * rootY + matrix.f };
@@ -238,6 +283,11 @@
   }
 
   function head(dx = 0, dy = -1, expression = 'normal', mouth = 0, tilt = 0) {
+    // Preserve the approved face pixel-for-pixel. Looking changes only the
+    // head's placement and the eyes' attention, never their shape or markings.
+    ctx.save();
+    ctx.translate(.75*gazeX,-1.1*gazeY);
+    ctx.translate(25,22);ctx.rotate(gazeX*(.045+.035*gazeY));ctx.translate(-25,-22);
     const turn = ([x, y]) => [25 + (x - 25) * Math.cos(tilt) - (y - 22) * Math.sin(tilt),
       22 + (x - 25) * Math.sin(tilt) + (y - 22) * Math.cos(tilt)];
     const shift = points => points.map(([x, y]) => turn([x + dx, y + dy]));
@@ -247,7 +297,7 @@
       polygon([[x,y],[x+width,y],[x+width,y+height],[x,y+height]].map(turn), ink);
     };
     const inkLine = (points, ink, thickness = 1) => line(points.map(turn), ink, thickness);
-    const matrix = ctx.getTransform();
+    const matrix = rigTransform();
     const corners = [[20 + dx, 3 + dy], [40 + dx, 3 + dy], [20 + dx, 23 + dy], [40 + dx, 23 + dy]]
       .map(turn).map(([x, y]) => [matrix.a * x + matrix.c * y + matrix.e, matrix.b * x + matrix.d * y + matrix.f]);
     headRegion = { left: Math.min(...corners.map(p => p[0])), right: Math.max(...corners.map(p => p[0])),
@@ -274,6 +324,7 @@
     box(29 + dx, 20 + dy, 1, 1, `${color.orange}44`);
     if (expression === 'normal' || expression === 'aim') {
       const pupil = expression === 'aim' && mouth > .35 ? 5 : 3;
+      ctx.save();ctx.translate(.65*gazeX,-.5*gazeY);
       for (const eyeX of [25, 34]) {
         if (pupil === 5) {
           // Rounded pixel pupil: narrow top/bottom rows and fuller middle rows.
@@ -282,6 +333,7 @@
         } else box(eyeX + dx, 13 + dy, 3, 3, color.eye);
         box(eyeX + dx, 13 + dy, 1, 1, color.cream);
       }
+      ctx.restore();
     } else {
       box(25 + dx, 14 + dy, 3, 1, color.eye);
       box(34 + dx, 14 + dy, 3, 1, color.eye);
@@ -312,6 +364,7 @@
       inkLine([[29 + dx, 18 + dy], [30 + dx, 19 + dy], [31 + dx, 18 + dy],
         [32 + dx, 19 + dy], [33 + dx, 18 + dy]], color.outline);
     }
+    ctx.restore();
   }
 
   // During stance, the paw retreats by exactly the distance the body advances.
@@ -335,9 +388,11 @@
     body();
     groundLeg([13,20],gaitFoot(13,distance,0),false,4);
     frontLeg([28,20],gaitFoot(28,distance,.25));
-    head();
+    const looking=Math.hypot(gazeX,gazeY)>.001;
+    if(!looking)head();
     polygon([[24,20],[28,20],[29,21],[28,22],[26,23],[24,22]],color.orange);
     polygon([[25,20],[28,20],[28,21],[26,22],[25,21]],color.cream);
+    if(looking)head();
   }
 
   function drawYawn(progress) {
@@ -528,9 +583,11 @@
     body(lift,arch,stretch);
     groundLeg([13+hipShift,20+lift-arch*.65],feet[2],false,4);
     frontLeg([28,20+lift],feet[3]);
-    head(-arch*.25,-1+lift*.4);
+    const looking=Math.hypot(gazeX,gazeY)>.001;
+    if(!looking)head(-arch*.25,-1+lift*.4);
     polygon([[24,20],[28,20],[29,21],[28,22],[26,23],[24,22]].map(([x,y])=>[x,y+lift]),color.orange);
     polygon([[25,20],[28,20],[28,21],[26,22],[25,21]].map(([x,y])=>[x,y+lift]),color.cream);
+    if(looking)head(-arch*.25,-1+lift*.4);
   }
 
   function drawTurn(progress) {
@@ -681,7 +738,7 @@
   }
   function drawPortalOpen(frame,progress) {
     ctx.save();const previousRasterTop=rasterTop;
-    if(canvas.height===40){ctx.translate(0,12);rasterTop=-12;}
+    if(spriteHeight===40){ctx.translate(0,12);rasterTop=-12;}
     const gesture=portalGesture(progress),rise=gesture.upright*actionWeight;
     // Rear paws remain planted. The hips support an upright chest while one
     // foreleg traces the circle; the torso never orbits the aperture.
@@ -782,6 +839,9 @@
   }
   const restingActions=new Set(['portal-open','button-tap','stretch','scratch','groom','belly-groom','sploot','belly','pet','tail-enjoy','grab','pounce','yawn','scared']);
   function drawExit(source,progress) {
+    const previousGaze=[gazeX,gazeY];
+    if(source.gaze){const weight=1-easePose(progress);gazeX=source.gaze[0]*weight;gazeY=source.gaze[1]*weight;}
+    try {
     if(progress>=1){actionWeight=1;postureOverride=null;drawWalk(0);return;}
     actionWeight=(source.exitWeight??1)*(1-easePose(progress));
     postureOverride=(easePose(source.progress/.16)*(1-easePose((source.progress-.84)/.16)))*actionWeight;
@@ -792,6 +852,7 @@
     } else if(source.kind==='idle')drawWalk(0);
     else drawAction(source.kind,source.frame,source.progress);
     actionWeight=1;postureOverride=null;
+    } finally {[gazeX,gazeY]=previousGaze;}
   }
   function tickPoseHandoff(now) {
     if(!poseHandoff)return false;
@@ -801,7 +862,7 @@
     if(turnMotion){turnMotion.start+=dt;turnMotion.lastTick=now;}followTime=now;
     const p=Math.min(1,(now-handoff.start)/220);
     ctx.clearRect(0,0,canvas.width,canvas.height);drawExit(handoff.source,p);
-    lastPose={...handoff.source,exitWeight:(handoff.source.exitWeight??1)*(1-easePose(p))};
+    lastPose={...handoff.source,gaze:handoff.source.gaze?.map(v=>v*(1-easePose(p))),exitWeight:(handoff.source.exitWeight??1)*(1-easePose(p))};
     stage.dataset.transition='settling';
     if(p>=1){poseHandoff=null;lastPose=null;delete stage.dataset.transition;lastPaint=-Infinity;}
     return true;
@@ -833,8 +894,9 @@
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     tailRoot = { x: 11, y: 21 };
     stage.dataset.action = kind;
+    updateGaze(kind);
     drawAction(kind,frame,progress);
-    lastPose={kind,frame,progress,distance:gaitDistance,gaitBlend};
+    lastPose={kind,frame,progress,distance:gaitDistance,gaitBlend,gaze:[gazeX,gazeY]};
     if (cursorPoint && active) {
       const point = pointerOnSprite(cursorPoint);
       showCursor(point ? cursorZone(point) : null);
@@ -1011,6 +1073,7 @@
   }
 
   function stop() {
+    resetGaze(true);
     visibilityPauseAt=null;
     featherPress=null;
     transportDriver?.cancel();
@@ -1094,7 +1157,7 @@
     if (walkAway !== null) {
       const elapsed = Math.max(0, now - walkAway.start);
       const progress = Math.min(1, elapsed / 3000);
-      if (now - lastPaint >= 1000 / 30) {
+      if (now - lastPaint >= 1000 / (Math.hypot(gazeX,gazeY)>.001?60:30) - .5) {
         lastPaint = now;
         currentX = walkAway.from + (walkAway.to - walkAway.from) * progress;
         canvas.style.transform = `translate3d(${currentX}px,0,0) scaleX(${direction})`;
@@ -1177,8 +1240,8 @@
       startedAt = now;
       elapsed = 0;
     }
-    const poseRate = ['walk','sprint','chase','turn'].includes(lastPose?.kind) ? 60 : 30;
-    if (now - lastPaint >= 1000 / poseRate) {
+    const poseRate = Math.hypot(gazeX,gazeY)>.001 || ['walk','sprint','chase','turn'].includes(lastPose?.kind) ? 60 : 30;
+    if (now - lastPaint >= 1000 / poseRate - .5) {
       lastPaint = now;
       let phaseTime = elapsed;
       let phase = sequence[0];
@@ -1294,7 +1357,7 @@
     if (point.x >= headRegion.left - 3 && point.x <= headRegion.right + 3 &&
         point.y >= headRegion.top - 5 && point.y <= headRegion.top + 16) return 'head';
     if (Math.abs(point.x - tailRoot.x) <= 6 && Math.abs(point.y - tailRoot.y) <= 7) return 'tail';
-    if(point.x>=-2&&point.x<=42&&point.y>=0&&point.y<=canvas.height+2)return 'body';
+    if(point.x>=-2&&point.x<=42&&point.y>=0&&point.y<=spriteHeight+2)return 'body';
     const lane=stage.getBoundingClientRect();
     const onLane=Number.isFinite(point.clientX)
       ? point.clientX>=lane.left && point.clientX<=lane.left+lane.width
@@ -1325,7 +1388,7 @@
     const x = (event.clientX - bounds.left) / bounds.width * 40;
     const facing = turnMotion && turnMotion.progress < .5 ? turnMotion.from : direction;
     return { clientX:event.clientX,x: facing === 1 ? x : 40 - x,
-      y: (event.clientY - bounds.top) / bounds.height * canvas.height };
+      y: (event.clientY - bounds.top) / bounds.height * spriteHeight };
   }
 
   function faceFeather(event) {
@@ -1352,6 +1415,7 @@
 
   function tickFeatherFollow(now) {
     if (!featherFollowing || playStarted !== null || petStarted !== null || tailStarted !== null) return false;
+    if(now-lastFeatherMotion>1100&&!featherPress&&!pounceHeld){endFeatherFollow(now);return false;}
     const point = cursorPoint && pointerOnSprite(cursorPoint);
     if (!point || cursorZone(point) !== 'front') { endFeatherFollow(now); return false; }
     faceFeather(cursorPoint);
@@ -1364,7 +1428,7 @@
     const step = (running?30:8) * pixelScale * dt;
     currentX += Math.sign(delta) * Math.min(Math.abs(delta), step);
     walkAway = null;
-    if (now - lastPaint >= 1000 / 30) {
+    if (now - lastPaint >= 1000 / (Math.hypot(gazeX,gazeY)>.001?60:30) - .5) {
       lastPaint = now;
       canvas.style.transform = `translate3d(${currentX}px,0,0) scaleX(${direction})`;
       paint(running?'sprint':'walk', 0);
@@ -1438,6 +1502,10 @@
   // Human input can interrupt automatic movement, including the quiet walk-away.
   // No hover pause is needed: latch a brief stroke across small hit-area boundaries.
   document.addEventListener('pointermove', event => {
+    if(event.pointerType==='mouse'||(event.pointerType==='pen'&&!event.buttons)){
+      gazePoint=event.buttons?null:{clientX:event.clientX,clientY:event.clientY};
+      if(active&&reducedMotion.matches&&!transportDriver?.blocksInput())paint('idle',0);
+    }
     if (transportDriver?.blocksInput()) return;
     if (featherPress && event.pointerId===featherPress.pointerId) {
       if (!featherPress.charged && Math.hypot(event.clientX-featherPress.event.clientX,event.clientY-featherPress.event.clientY)>12) {
@@ -1471,6 +1539,7 @@
     } else if ((!laneMotion || laneMotion.kind==='raised') && !reducedMotion.matches && zone === 'front' && !event.buttons &&
         playStarted === null && petStarted === null && tailStarted === null) {
       if (!featherFollowing) followTime = now;
+      if(!previousPoint||Math.hypot(event.clientX-previousPoint.clientX,event.clientY-previousPoint.clientY)>=1)lastFeatherMotion=now;
       featherFollowing = true;
       faceFeather(event);
     } else if (featherFollowing && zone !== 'front') endFeatherFollow(now);
@@ -1502,6 +1571,7 @@
   }, { passive: true });
 
   document.addEventListener('pointerdown', event => {
+    gazePoint=null;
     if (transportDriver?.blocksInput()) return;
     if (!active || reducedMotion.matches || !event.isPrimary || event.button !== 0) return;
     const point = pointerOnSprite(event);
@@ -1546,9 +1616,9 @@
   document.addEventListener('pointercancel', event => releaseCharge(event, true));
   document.addEventListener('contextmenu', event => {if(featherPress||pounceHeld)event.preventDefault();});
   document.addEventListener('pointerout', event => {
-    if (!event.relatedTarget) { endFeatherFollow(performance.now()); releaseCharge(null, true); cursorPoint = null; clearCursor(); stroke = null; }
+    if (!event.relatedTarget) { gazePoint=null;endFeatherFollow(performance.now()); releaseCharge(null, true); cursorPoint = null; clearCursor(); stroke = null; if(active&&reducedMotion.matches&&!transportDriver?.blocksInput())paint('idle',0); }
   });
-  window.addEventListener('blur', () => { endFeatherFollow(performance.now()); releaseCharge(null, true); cursorPoint = null; clearCursor(); });
+  window.addEventListener('blur', () => { resetGaze(true);endFeatherFollow(performance.now()); releaseCharge(null, true); cursorPoint = null; clearCursor(); if(active&&reducedMotion.matches&&!transportDriver?.blocksInput())paint('idle',0); });
 
   stage.catTransport = {
     install(driver) { transportDriver = driver; if(active)driver.appear(); },
@@ -1590,19 +1660,19 @@
       if(!active)return false;
       const point=pointerOnSprite(event);if(!point)return false;
       const radius=event.pointerType==='touch'?3:1;
-      if(point.x < -radius || point.x > 40+radius || point.y < -radius || point.y > canvas.height+radius)return false;
-      if(!ctx.getImageData)return point.x>=3&&point.x<=40&&point.y>=2&&point.y<=canvas.height;
+      if(point.x < -radius || point.x > 40+radius || point.y < -radius || point.y > spriteHeight+radius)return false;
+      if(!ctx.getImageData)return point.x>=3&&point.x<=40&&point.y>=2&&point.y<=spriteHeight;
       const x=Math.max(0,Math.floor(point.x)-radius),y=Math.max(0,Math.floor(point.y)-radius);
-      const w=Math.min(40-x,radius*2+1),h=Math.min(canvas.height-y,radius*2+1);
+      const w=Math.min(40-x,radius*2+1),h=Math.min(spriteHeight-y,radius*2+1);
       if(w<=0||h<=0)return false;
-      const data=ctx.getImageData(x,y,w,h).data;
+      const data=ctx.getImageData(x*rasterScale,y*rasterScale,w*rasterScale,h*rasterScale).data;
       for(let i=3;i<data.length;i+=4)if(data[i]>40)return true;
       return false;
     },
     scruffPoint() {
       const r=canvas.getBoundingClientRect(),x=headRegion.left-.5,y=headRegion.top+10;
       const facing=turnMotion && turnMotion.progress<.5 ? turnMotion.from : direction;
-      return {x:r.left+(facing===1?x:40-x)*r.width/40,y:r.top+y*r.height/canvas.height};
+      return {x:r.left+(facing===1?x:40-x)*r.width/40,y:r.top+y*r.height/spriteHeight};
     },
     platformLanded(expanded) {
       poseHandoff=null;lastPose=null;catLift=laneOffset=0;
@@ -1612,7 +1682,7 @@
     },
     prepareLift() { liftOrigin=lastPose?{...lastPose}:{kind:'idle',frame:0,progress:0,distance:0}; },
     lift(progress,frame=0) {
-      if(canvas.height!==40){canvas.height=40;ctx.imageSmoothingEnabled=false;}
+      if(spriteHeight!==40)setSpriteHeight(40);
       canvas.style.height=`${canvas.getBoundingClientRect().width}px`;
       ctx.clearRect(0,0,40,40);
       if(progress<.35)drawExit(liftOrigin||{kind:'idle',frame:0,progress:0,distance:0},progress/.35);
@@ -1625,13 +1695,14 @@
       stage.dataset.action='idle';stage.dataset.transition='settling';
     },
     lower(progress,amount=1,frame=0) {
-      if(canvas.height!==40){canvas.height=40;ctx.imageSmoothingEnabled=false;}
+      if(spriteHeight!==40)setSpriteHeight(40);
       canvas.style.height=`${canvas.getBoundingClientRect().width}px`;
       ctx.clearRect(0,0,canvas.width,canvas.height);drawCarried(frame,amount*(1-easePose(progress)));
       stage.dataset.action='falling';stage.dataset.transition='lowering';
       if(progress>=1)lastPose=null;
     },
     pause() {
+      resetGaze();
       featherPress=null;
       poseHandoff=null;
       resetLane();turnMotion=null;playStarted=petStarted=tailStarted=null;
@@ -1643,7 +1714,7 @@
     portalGesture,
     render(kind,frame=0,progress=0,distance=0,facing=direction) {
       const height = kind === 'carried' || kind === 'portal-open' ? 40 : 28;
-      if (canvas.height !== height) { canvas.height=height;ctx.imageSmoothingEnabled=false; }
+      if (spriteHeight !== height) setSpriteHeight(height);
       if (height === 40) canvas.style.height=`${canvas.getBoundingClientRect().width}px`;
       else canvas.style.removeProperty('height');
       // Transport supplies travelled sprite pixels. Do not add the home lane's stale delta.
@@ -1652,7 +1723,7 @@
       paint(kind,frame,progress);
     },
     resume(x, facing=direction) {
-      if (canvas.height !== 28) { canvas.height=28;ctx.imageSmoothingEnabled=false; }
+      if (spriteHeight !== 28) setSpriteHeight(28);
       canvas.style.removeProperty('height');delete stage.dataset.transition;
       measure();currentX=lastGaitX=Math.max(0,Math.min(travel,x));direction=facing;
       const along=travel?(direction===1?currentX/travel:1-currentX/travel):0;
@@ -1682,7 +1753,7 @@
     if(!active||visibilityPauseAt!==null)return;
     visibilityPauseAt=performance.now();
     cancelAnimationFrame(frameRequest);frameRequest=0;
-    cursorPoint=null;stroke=null;clearCursor();
+    resetGaze(true);cursorPoint=null;stroke=null;clearCursor();
     transportDriver?.suspend?.();
   }
   function resumeVisibility() {
