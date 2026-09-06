@@ -62,6 +62,8 @@
   let pendingInput = null;
   let pounceHeld = false;
   let chargePointer = null;
+  let featherPress = null;
+  const featherHoldDuration = 180;
   const timing = { pet: 1500, tail: 1800, grab: 1200, pounce: 1300 };
   const pounceTiming = { takeoff: .48, landing: .86 };
   let playKind = 'pounce';
@@ -913,6 +915,15 @@
     const clamp = t => Math.max(0, Math.min(1, t));
     const smooth = t => t * t * (3 - 2 * t);
     let pose = 'scared', progress = 1, frame = Math.floor(elapsed / 80);
+    if(motion.kind==='raised' && (motion.relaxed || elapsed>=1200)) {
+      if(!motion.relaxed) {
+        motion.relaxed=true;
+        const along=travel?(direction===1?currentX/travel:1-currentX/travel):0;
+        buildSequence(Math.max(0,Math.min(.999,along)));startedAt=now;lastPaint=-Infinity;
+      }
+      stage.style.transform=`translate3d(0,${-laneOffset}px,0)`;
+      return false;
+    }
     if (motion.kind === 'background') {
       const t = clamp((elapsed - (motion.expanded ? 70 : 0)) / Math.max(1,motion.duration - (motion.expanded ? 70 : 0)));
       const descent = motion.expanded ? t * t : smooth(t);
@@ -986,6 +997,7 @@
   }
 
   function stop() {
+    featherPress=null;
     transportDriver?.cancel();
     poseHandoff=null;lastPose=null;liftOrigin=null;gaitBlend=0;gaitPaintAt=0;
     if (pet.dataset.dismissed === 'true') pendingLandingGroom = pendingCompactTension = false;
@@ -1018,6 +1030,13 @@
     if (document.hidden || !stage.isConnected || !pet.isConnected) { stop(); return; }
     if (transportDriver?.tick(now)) { if (active && !frameRequest) frameRequest = requestAnimationFrame(tick); return; }
     if (reducedMotion.matches) { if (transportDriver?.isAway()) frameRequest = requestAnimationFrame(tick); return; }
+    if (featherPress && !featherPress.charged) {
+      if (now-featherPress.start < featherHoldDuration) {
+        frameRequest=requestAnimationFrame(tick);return;
+      }
+      featherPress.charged=true;
+      startInput('pounce',featherPress.event,now);
+    }
     // Reconcile after transport yields control as well as on hover events. An
     // event received during entry/drag must never leave a raised, empty lane.
     if (desktopLane.matches) {
@@ -1235,6 +1254,7 @@
   }
 
   function cursorZone(point) {
+    if (!point) return null;
     if (onScruff(point)) return 'scruff';
     if (point.x >= headRegion.left - 3 && point.x <= headRegion.right + 3 &&
         point.y >= headRegion.top - 5 && point.y <= headRegion.top + 16) return 'head';
@@ -1314,7 +1334,7 @@
   }
 
   function startInput(kind, event, now) {
-    if (laneMotion) return;
+    if (laneMotion && laneMotion.kind!=='raised') return;
     featherFollowing = false;
     const current = petStarted !== null ? 'pet' : tailStarted !== null ? 'tail-enjoy' : playStarted !== null ? playKind : null;
     stroke = null;
@@ -1380,7 +1400,13 @@
   // No hover pause is needed: latch a brief stroke across small hit-area boundaries.
   document.addEventListener('pointermove', event => {
     if (transportDriver?.blocksInput()) return;
-    if (!active || event.pointerType !== 'mouse') { clearCursor(); return; }
+    if (featherPress && event.pointerId===featherPress.pointerId) {
+      if (!featherPress.charged && Math.hypot(event.clientX-featherPress.event.clientX,event.clientY-featherPress.event.clientY)>12) {
+        featherPress=null;clearCursor();return;
+      }
+      if (featherPress.charged) featherPress.event={clientX:event.clientX,clientY:event.clientY,pointerId:event.pointerId};
+    }
+    if (!active || (event.pointerType !== 'mouse' && !(pounceHeld && event.pointerId===chargePointer))) { clearCursor(); return; }
     const previousPoint = cursorPoint;
     cursorPoint = { clientX: event.clientX, clientY: event.clientY };
     if (!featherToy.hidden) {
@@ -1403,7 +1429,7 @@
       faceFeather(event);
       const target = featherTarget(event, 0);
       playTarget = playOrigin + Math.sign(target - playOrigin) * Math.min(70, Math.abs(target - playOrigin));
-    } else if (!laneMotion && !reducedMotion.matches && zone === 'front' && !event.buttons &&
+    } else if ((!laneMotion || laneMotion.kind==='raised') && !reducedMotion.matches && zone === 'front' && !event.buttons &&
         playStarted === null && petStarted === null && tailStarted === null) {
       if (!featherFollowing) followTime = now;
       featherFollowing = true;
@@ -1440,10 +1466,27 @@
     if (transportDriver?.blocksInput()) return;
     if (!active || reducedMotion.matches || !event.isPrimary || event.button !== 0) return;
     const point = pointerOnSprite(event);
-    if (!point || cursorZone(point) !== 'front') return;
-    startInput('pounce', event, performance.now());
+    if (!point || cursorZone(point) !== 'front' || !featherWithinReach(event) || (laneMotion && laneMotion.kind!=='raised') ||
+      event.target?.closest?.('a, button, summary, input, textarea, select, [contenteditable]')) return;
+    event.preventDefault?.();
+    endFeatherFollow(performance.now());stroke=null;
+    lastInteractionMove=performance.now();
+    featherPress={pointerId:event.pointerId,start:performance.now(),charged:false,
+      event:{clientX:event.clientX,clientY:event.clientY,pointerId:event.pointerId}};
+    cursorPoint=featherPress.event;
+    featherToy.style.left=`${event.clientX-22}px`;featherToy.style.top=`${event.clientY-9}px`;
+    featherToy.hidden=false;
+    document.documentElement.classList.add('cat-cursor-playing');
   });
   function releaseCharge(event, cancelled = false) {
+    if (featherPress && (!event || event.pointerId===featherPress.pointerId)) {
+      const press=featherPress;featherPress=null;
+      if (!press.charged) {
+        if (!cancelled) startInput('grab',press.event,performance.now());
+        else clearCursor();
+        return;
+      }
+    }
     if (!pounceHeld || (event && event.pointerId !== chargePointer)) return;
     pounceHeld = false;
     chargePointer = null;
@@ -1460,6 +1503,7 @@
   }
   document.addEventListener('pointerup', event => releaseCharge(event));
   document.addEventListener('pointercancel', event => releaseCharge(event, true));
+  document.addEventListener('contextmenu', event => {if(featherPress||pounceHeld)event.preventDefault();});
   document.addEventListener('pointerout', event => {
     if (!event.relatedTarget) { endFeatherFollow(performance.now()); releaseCharge(null, true); cursorPoint = null; clearCursor(); stroke = null; }
   });
@@ -1468,12 +1512,30 @@
   stage.catTransport = {
     install(driver) { transportDriver = driver; if(active)driver.appear(); },
     hide: stop,
-    presented() { if((pet.dataset.lanePreview??pet.dataset.open)==='true')raiseLane(); },
+    presented() { if((pet.dataset.lanePreview??pet.dataset.open)==='true' && laneMotion?.kind!=='raised')raiseLane(); },
+    homeLineY(baseY) {
+      if(!desktopLane.matches || (pet.dataset.lanePreview??pet.dataset.open)!=='true')return baseY;
+      const photo=document.querySelector('.pet-portrait').getBoundingClientRect();
+      const contact=document.querySelector('.profile-contact').getBoundingClientRect();
+      const desired=Math.min(photo.top-16,Math.max(contact.bottom+canvas.getBoundingClientRect().width*.7+16,photo.top-24));
+      return Math.min(baseY,desired+(window.scrollY||0));
+    },
+    adoptHome(y) {
+      if(!desktopLane.matches || (pet.dataset.lanePreview??pet.dataset.open)!=='true')return;
+      laneOffset=catLift=Math.max(0,stage.getBoundingClientRect().bottom-(y-(window.scrollY||0)));
+      laneMotion={kind:'raised',start:performance.now(),relaxed:true};
+      stage.dataset.lane='raised';stage.style.transform=`translate3d(0,${-laneOffset}px,0)`;
+    },
     active: () => active,
-    interacting: (now = performance.now()) => active && (pounceHeld || pendingInput !== null ||
+    interacting: (now = performance.now()) => active && (featherPress !== null || pounceHeld || pendingInput !== null ||
       playStarted !== null || petStarted !== null || tailStarted !== null || now-lastInteractionMove < 200),
     direction: () => turnMotion && turnMotion.progress < .5 ? turnMotion.from : direction,
     reduced: () => reducedMotion.matches,
+    tapKind(event) {
+      const zone=cursorZone(pointerOnSprite(event));
+      return zone==='head'||zone==='scruff'?'pet':zone==='tail'?'tail-enjoy':null;
+    },
+    tap(kind,event) { if(kind)startInput(kind,event,performance.now()); },
     hitScruff(event) {
       return active && onScruff(pointerOnSprite(event),event.pointerType==='touch'?1.5:0);
     },
@@ -1523,6 +1585,7 @@
       if(progress>=1)lastPose=null;
     },
     pause() {
+      featherPress=null;
       poseHandoff=null;
       resetLane();turnMotion=null;playStarted=petStarted=tailStarted=null;
       pendingInput=walkAway=null;pounceHeld=false;chargePointer=null;

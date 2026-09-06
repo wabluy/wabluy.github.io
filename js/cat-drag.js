@@ -49,7 +49,12 @@
     const r=element.getBoundingClientRect();
     return r.width<56?null:{left:r.left+sx(),y:(edge==='bottom'?r.bottom:r.top)+sy(),width:r.width};
   }
-  const homeRect=()=>lineRect(home);
+  const homeRect=()=>{
+    const r=lineRect(home);if(!r)return null;
+    const y=api.homeLineY?.(r.y)??r.y;
+    home.style.setProperty?.('--cat-home-rule-offset',`${y-r.y}px`);
+    return {...r,y};
+  };
   function targets() {
     const items=[{id:'home',element:home},
       {id:'background',element:document.getElementById('projects')},
@@ -111,8 +116,8 @@
   function nearest(point) {
     const control=nearbyControl(point);if(control)return control;
     const feet=point.y+width()*.8+sy(),x=point.x+sx();
-    return targets().filter(item=>x>=item.rect.left-30&&x<=item.rect.left+item.rect.width+30&&Math.abs(item.rect.y-feet)<38)
-      .sort((a,b)=>Math.abs(a.rect.y-feet)-Math.abs(b.rect.y-feet))[0]||null;
+    return targets().filter(item=>x>=item.rect.left-30&&x<=item.rect.left+item.rect.width+30&&item.rect.y>=feet-4)
+      .sort((a,b)=>a.rect.y-b.rect.y)[0]||null;
   }
   function showGuide(item) {
     const r=item&&currentLine(item);guide.hidden=!r;if(!r)return;
@@ -147,6 +152,7 @@
     delete stage.dataset.transported;delete home.dataset.away;
     canvas.style.removeProperty('bottom');canvas.style.removeProperty('height');
     const r=homeRect();api.resume(x===null?Math.max(0,(r?.width||width())/2-width()/2):x,facing);
+    if(r)api.adoptHome?.(r.y);
   }
   function releaseCapture(id) {
     releasingCapture=true;
@@ -185,7 +191,7 @@
     const here=canvas.getBoundingClientRect().left+sx()-r.left;
     const fraction=here>(r.width-w)/2?.12+Math.random()*.18:.7+Math.random()*.18;
     returnHome(now);
-    state.excursion={target,parked,fraction};
+    state.excursion={target,parked,fraction,sameLine:true};
     nextWanderAt=now+45000;
     return true;
   }
@@ -205,21 +211,26 @@
     clearDecorations();
     if(item.id==='home'&&returnTarget.id==='home'){state=null;restoreHome(x,facing);if(!portalWanted)returnHome(now,'exiting');return;}
     // Restore the lane and sprite transform in the same frame: no left-edge flash.
-    state={mode:'parked',target:item,returnTarget,deadline:now+10000};setLine(r);api.resume(x,facing);
+    const sameOrigin=item.element===returnTarget.element;
+    state={mode:'parked',target:item,returnTarget,viewportFollow:sameOrigin,deadline:sameOrigin?Infinity:now+10000};setLine(r);api.resume(x,facing);
     if(!portalWanted)returnHome(now,'exiting');
     else if(item.control)beginPrank(item,now);
   }
   function release(event,cancelled=false) {
     if(!state||state.pointerId!==event.pointerId||!['arming','dragging'].includes(state.mode))return;
     clearTimeout(holdTimer);holdTimer=0;releaseCapture(event.pointerId);hint.hidden=true;
-    if(state.mode==='arming'){restoreOrigin(state);return;}
+    if(state.mode==='arming'){
+      const held=state;restoreOrigin(held);
+      if(!cancelled&&held.tapKind)api.tap?.(held.tapKind,held.point);
+      return;
+    }
     const held=state;
     const target=(!cancelled&&nearest(held.point))||held.previous?.target||{id:'home',element:home};
     const r=currentLine(target);if(!r){returnHome(performance.now());return;}
     const sprite=canvas.getBoundingClientRect();
     clearDecorations();
     reserveLine(target);homeVacant(target.id!=='home');
-    state={mode:'landing',target,returnTarget:held.previous?.target||{id:'home',element:home},dropX:clamp(sprite.left+sx(),r.left,r.left+r.width-width()),
+    state={mode:'landing',duration:clamp(Math.sqrt(Math.max(0,r.y-sprite.bottom-sy())*1000),320,600),target,returnTarget:held.previous?.target||{id:'home',element:home},dropX:clamp(sprite.left+sx(),r.left,r.left+r.width-width()),
       from:{x:sprite.left+sx(),y:sprite.bottom+sy(),top:sprite.top+sy()},amount:Math.max(0,((held.liftProgress||0)-.35)/.65),start:performance.now(),facing:held.facing};
     api.pause();
     // Moving the cat never opens or closes the content belonging to a separator.
@@ -510,7 +521,8 @@
       canvas.style.opacity=p>=1?'0':'1';
       if(p>=1&&!state.departureReleased) {
         // Once the cat is fully inside, release its old line during gate closure.
-        reserveLine(null);homeVacant(true);state.departureReleased=true;
+        if(!state.excursion?.sameLine||!portalWanted){reserveLine(null);homeVacant(true);}
+        state.departureReleased=true;
       }
       return;
     }
@@ -571,7 +583,7 @@
     }
     if(state.mode==='landing') {
       const r=currentLine(state.target);if(!r){returnHome(now);return true;}
-      const p=api.reduced()?1:clamp((now-state.start)/320,0,1);
+      const p=api.reduced()?1:clamp((now-state.start)/(state.duration||320),0,1);
       const left=clamp(state.dropX,r.left,r.left+Math.max(0,r.width-width()));
       const w=width(),top=state.from.top+(r.y-w*.675-state.from.top)*p*p;
       externalBox(state.from.x+(left-state.from.x)*smooth(p),top,w,w);
@@ -638,7 +650,7 @@
     event.preventDefault();event.stopPropagation();
     window.getSelection()?.removeAllRanges();document.documentElement.classList.add('cat-handling');
     const r=canvas.getBoundingClientRect(),previous=state;
-    state={mode:'arming',pointerId:event.pointerId,point:{x:event.clientX,y:event.clientY},origin:{x:event.clientX,y:event.clientY},
+    state={mode:'arming',tapKind:api.tapKind?.(event),pointerId:event.pointerId,point:{x:event.clientX,y:event.clientY},origin:{x:event.clientX,y:event.clientY},
       pressStart:performance.now(),from:{left:r.left+sx(),top:r.top+sy(),bottom:r.bottom+sy(),height:r.height},previous,facing:api.direction(),touch:event.pointerType==='touch'};
     api.prepareLift();api.pause();canvas.setPointerCapture(event.pointerId);
     externalBox(state.from.left,state.from.top,r.width,r.height);canvas.style.bottom='0';canvas.style.transform=`scaleX(${state.facing})`;showHint(state.origin);

@@ -76,7 +76,8 @@ html.cat-cursor-playing, html.cat-cursor-playing * { cursor: none !important; }
 html.cat-carrying, html.cat-carrying * { cursor: grabbing !important; user-select: none !important; }
 
 @media (min-width: 1100px) {
-  .cat-home-anchor[data-away='true'] { visibility: visible; border-bottom: 1px solid var(--line); }
+  .cat-home-anchor[data-away='true'] { visibility: visible; }
+  .cat-home-anchor[data-away='true']::after { content: ''; position: absolute; inset-inline: 0; bottom: 0; border-bottom: 1px solid var(--line); transform: translateY(var(--cat-home-rule-offset, 0px)); }
 }
 
 html.cat-cursor-scruff, html.cat-cursor-scruff * { cursor: grab !important; }
