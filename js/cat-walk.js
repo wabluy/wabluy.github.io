@@ -74,6 +74,7 @@
   let playStarted = null;
   let pendingInput = null;
   let pounceHeld = false;
+  let pounceReleasePose = null;
   let chargePointer = null;
   let featherPress = null;
   const featherHoldDuration = 180;
@@ -746,30 +747,48 @@
     const flight = clamp((progress - pounceTiming.takeoff) / (pounceTiming.landing - pounceTiming.takeoff));
     const settling = clamp((progress - pounceTiming.landing) / (1 - pounceTiming.landing));
     return { prep, flight, crouch: progress < pounceTiming.takeoff ? smooth(clamp(prep * 2.5))
-      : progress < pounceTiming.landing ? 0 : Math.sin(settling * Math.PI),
+      : progress < pounceTiming.landing ? 1-smooth(clamp(flight/.24)) : Math.sin(settling * Math.PI),
       retreat: progress < pounceTiming.takeoff ? smooth(prep) : 1 - flight,
       wiggle: progress < pounceTiming.takeoff ? Math.sin(prep * Math.PI * 5) * Math.sin(prep * Math.PI) : 0 };
   }
 
-  function drawPounce(progress, frame = 0) {
-    const pose = pouncePose(progress);
-    const { prep, flight } = pose;
+  function pounceAppearance(progress,frame,charge={held:pounceHeld,backstep:pounceBackstep/pixelScale,release:pounceReleasePose}) {
+    const pose=pouncePose(progress),aiming=progress<pounceTiming.takeoff;
+    const departure=progress<pounceTiming.landing?1-easePose(pose.flight/.24):0;
+    const release=!aiming?charge.release:null;
+    return { ...pose,
+      crouch:release&&progress<pounceTiming.landing?release.crouch*departure:pose.crouch,
+      wiggle:aiming?(charge.held?Math.sin(frame*.36)*Math.min(1,pose.prep*3):pose.wiggle):(release?.wiggle||0)*departure,
+      plant:aiming?charge.backstep*pose.retreat:(release?.plant??charge.backstep)*departure,
+      focus:aiming?pose.prep:(release?.focus??1)*departure,
+      tailFrame:release?release.tailFrame+timing.pounce*(progress-pounceTiming.takeoff)/80:frame
+    };
+  }
+
+  function drawPounce(progress, frame = 0, charge) {
+    if(progress>=1){drawStanding();return;}
+    const pose = pounceAppearance(progress,frame,charge);
+    const { flight } = pose;
     const crouch=pose.crouch*actionWeight;
-    const wiggle = pounceHeld ? Math.sin(frame * .36) * Math.min(1, prep * 3) : pose.wiggle;
-    const aiming = progress < pounceTiming.takeoff;
     const reach = Math.sin(flight * Math.PI)*actionWeight;
-    const hip = aiming ? wiggle * 1.6 * actionWeight : 0;
+    const hip = pose.wiggle * 1.1 * actionWeight;
     // Only the haunches sway; the chest and planted feet do not translate with the hips.
-    const plant=aiming?pounceBackstep*pose.retreat*actionWeight/pixelScale:0;
+    const plant=pose.plant*actionWeight;
     const foot=(x,dx,dy)=>[x+plant+dx*reach,26+dy*reach];
-    tail(crouch, Math.sin(frame*.36)*.65*crouch);
-    groundLeg([11+hip,20+crouch*.6],foot(13,-2,-2),true,4);
-    frontLeg([23,20+crouch*.6],foot(24,4,-2),true);
-    ctx.save();ctx.translate(0,26*.1*crouch);ctx.scale(1,1-.1*crouch);
+    const shoulderY=20+1.06*crouch;
+    ctx.save();ctx.translate(hip,0);tail(crouch, Math.sin(pose.tailFrame*.36)*.65*crouch);ctx.restore();
+    groundLeg([11+hip,shoulderY],foot(11,-2,-2),true,4);
+    frontLeg([23,shoulderY],foot(23,4,-2),true);
+    // Lower the chest into bent forelegs without flattening or lengthening the torso.
+    ctx.save();ctx.translate(0,2.26*crouch);ctx.scale(1,1-.06*crouch);
     body(0,0,0,hip);ctx.restore();
-    groundLeg([13+hip*.87,20+crouch*.6],foot(15,-3,-2),false,4);
-    frontLeg([28,20+crouch*.6],foot(28.5,5,-3));
-    head(0,-1+3*crouch,aiming&&actionWeight>.3?'aim':'normal',prep*actionWeight);
+    groundLeg([13+hip*.87,shoulderY],foot(15,-3,-2),false,4);
+    frontLeg([28,shoulderY],foot(28,5,-3));
+    head(0,-1+3*crouch,pose.focus*actionWeight>.3?'aim':'normal',pose.focus*actionWeight);
+    // Keep the shoulder roots covered by the same chest fur as the standing rig.
+    const chest=points=>points.map(([x,y])=>[x,y*(1-.06*crouch)+2.26*crouch]);
+    polygon(chest([[24,20],[28,20],[29,21],[28,22],[26,23],[24,22]]),color.orange);
+    polygon(chest([[25,20],[28,20],[28,21],[26,22],[25,21]]),color.cream);
 
   }
 
@@ -898,7 +917,8 @@
     if(source.kind==='turn')drawTurn(source.progress+(source.progress<.5?-source.progress:1-source.progress)*easePose(progress));
     else if(['walk','chase','sprint'].includes(source.kind)) {
       drawSprint(source.distance||0,source.gaitBlend??0,easePose(progress));
-    } else if(source.kind==='idle')drawStanding();
+    } else if(source.kind==='pounce')drawPounce(source.progress,source.frame,source.charge);
+    else if(source.kind==='idle')drawStanding();
     else drawAction(source.kind,source.frame,source.progress);
     actionWeight=1;postureOverride=null;
     } finally {[gazeX,gazeY,gazeFocus]=previousGaze;}
@@ -919,7 +939,7 @@
 
   function paint(kind, frame, progress = 0) {
     if(poseHandoff && !transportDriver?.blocksInput())return;
-    frame = Number.isFinite(frame) ? Math.max(0, Math.floor(frame)) : 0;
+    frame = Number.isFinite(frame) ? Math.max(0, kind==='pounce'?frame:Math.floor(frame)) : 0;
     progress = Number.isFinite(progress) ? Math.max(0, Math.min(1, progress)) : 0;
     if (turnMotion) {
       kind = 'turn';
@@ -945,7 +965,8 @@
     stage.dataset.action = kind;
     updateGaze(kind);
     drawAction(kind,frame,progress);
-    lastPose={kind,frame,progress,distance:gaitDistance,gaitBlend,gaze:[gazeX,gazeY,gazeFocus]};
+    lastPose={kind,frame,progress,distance:gaitDistance,gaitBlend,gaze:[gazeX,gazeY,gazeFocus],
+      ...(kind==='pounce'?{charge:{held:pounceHeld,backstep:pounceBackstep/pixelScale,release:pounceReleasePose}}:{})};
     if (cursorPoint && active) {
       const point = pointerOnSprite(cursorPoint);
       const overControl=cursorPoint.target?.closest?.('a, button, summary, input, textarea, select, [contenteditable]');
@@ -1262,7 +1283,7 @@
       const playElapsed = pounceHeld ? Math.min(rawElapsed, timing.pounce * (pounceTiming.takeoff - .001)) : rawElapsed;
       const duration = timing[playKind];
       if (playElapsed < duration) {
-        if (now - lastPaint >= 1000 / 30) {
+        if (now - lastPaint >= 1000 / (playKind==='pounce'?60:30) - .5) {
           lastPaint = now;
           const progress = playElapsed / duration;
           const pose = pouncePose(progress);
@@ -1273,7 +1294,7 @@
           const jump = playKind === 'pounce' ? Math.sin(pose.flight * Math.PI) * 10 : 0;
           canvas.style.transform = `translate3d(${currentX}px,${-jump}px,0) scaleX(${direction})`;
           treat.hidden = true;
-          paint(playKind, Math.floor(rawElapsed / 80), progress);
+          paint(playKind, playKind==='pounce'?rawElapsed/80:Math.floor(rawElapsed/80), progress);
         }
         frameRequest = requestAnimationFrame(tick);
         return;
@@ -1569,10 +1590,11 @@
     stroke = null;
     playKind = kind;
     pounceHeld = kind === 'pounce';
+    pounceReleasePose = null;
     chargePointer = pounceHeld ? event.pointerId : null;
     playOrigin = currentX;
     faceFeather(event);
-    pounceBackstep = Math.min(3 * pixelScale, direction === 1 ? playOrigin : travel - playOrigin);
+    pounceBackstep = Math.min(1.5 * pixelScale, direction === 1 ? playOrigin : travel - playOrigin);
     const target = featherTarget(event, 0);
     playTarget = currentX + Math.sign(target - currentX) * Math.min(70, Math.abs(target - currentX));
     featherToy.style.left = `${event.clientX - 22}px`;
@@ -1684,6 +1706,9 @@
       }
     }
     if (!pounceHeld || (event && event.pointerId !== chargePointer)) return;
+    // Depart from the actual held pose, including its hip phase and planted feet.
+    const source=lastPose?.kind==='pounce'?lastPose:null;
+    pounceReleasePose=pounceAppearance(source?.progress??0,source?.frame??0,source?.charge);
     pounceHeld = false;
     chargePointer = null;
     const now = performance.now();
