@@ -45,7 +45,7 @@
   let nextWanderAt=performance.now()+wanderCooldown;
   let homeRule=null;
   let state=null,holdTimer=0,lastTick=0,releasingCapture=false,lastHover=null;
-  let viewportDirty=false,layoutFollowUntil=0;
+  let viewportDirty=false,layoutFollowUntil=0,scrollResumeAt=0;
   function lineRect(element,edge='top') {
     if(!element?.isConnected)return null;
     const r=element.getBoundingClientRect();
@@ -133,7 +133,12 @@
     const transferring=state&&['entering','returning'].includes(state.mode);
     if(state&&state.mode!=='parked'&&state.mode!=='viewport-wait'&&!transferring)return;
     if(api.interacting?.(now))return;
-    const target=viewportTarget();viewportDirty=false;
+    const target=viewportTarget();
+    const staying=state?.mode==='parked'?state.target:!state?{element:home}:null;
+    if(now<scrollResumeAt&&(!staying||staying.element!==target?.element)){
+      waitForViewport();viewportDirty=true;return;
+    }
+    viewportDirty=false;
     if(!target){waitForViewport();return;}
     const current=transferring?(state.excursion?.target||{id:'home',element:home}):
       state?.target||{id:'home',element:home};
@@ -440,7 +445,7 @@
     state=null;restoreHome();homeVacant(true);api.hide();
   }
   function appear() {
-    portalWanted=true;viewportDirty=false;layoutFollowUntil=0;
+    portalWanted=true;viewportDirty=false;layoutFollowUntil=0;scrollResumeAt=0;
     restoreHome();homeVacant(true);api.pause();
     if(introCard?.dataset.intro==='pending' && introStarted!==introCard.dataset.introSequence && introButton) {
       introStarted=introCard.dataset.introSequence;
@@ -601,8 +606,8 @@
     if(state.mode==='returning' && !portalWanted && !state.homeReserved){finishHidden();return;}
     const enter=elapsed-portalExit,holeX=goalX-w*.12;
     // Sample once per arrival. Neither a new frame nor a resize changes its mood.
-    if(!state.arrival)state.arrival={walk:5600+Math.random()*400,
-      pause:Math.random()<.45?1500+Math.random()*500:0};
+    if(!state.arrival)state.arrival=state.viewportTransfer?{walk:2000,pause:0}:
+      {walk:5600+Math.random()*400,pause:Math.random()<.45?1500+Math.random()*500:0};
     if(state.arrival.segmented===undefined)state.arrival.segmented=state.arrival.pause>0;
     const arrival=state.arrival,approach=arrival.walk*.62,afterOpen=Math.max(0,enter-portalTiming.open);
     // Closing cancels optional dawdling, while preserving the travelled distance.
@@ -618,7 +623,7 @@
     const opening=clamp(enter/portalTiming.open,0,1),fade=1-clamp((enter-finished)/portalTiming.close,0,1);
     showHole(holeX,r.y,opening,enter/1000,fade,false);
     const lickTime=grooming?afterOpen-approach:0;
-    floatCat(left,goalY,grooming?'groom':along<1?'walk':'idle',Math.floor(lickTime/75),
+    floatCat(left,goalY,grooming?'groom':along<1?(state.viewportTransfer?'sprint':'walk'):'idle',Math.floor(lickTime/75),
       grooming?lickTime/arrival.pause:0,56*along,1);
     portalOcclusion(left,goalY,holeX,r.y,1,true);
     if(along===0)canvas.style.opacity='0';
@@ -755,7 +760,7 @@
     if(event.pointerType==='mouse'&&!event.buttons&&api.hitScruff(event))showHint(api.scruffPoint());else hint.hidden=true;
   },{passive:true});
   document.addEventListener('keydown',event=>{if(event.key==='Escape'&&state){event.preventDefault();event.stopImmediatePropagation();cancel();}},true);
-  window.addEventListener('scroll',viewportChanged,{passive:true});
+  window.addEventListener('scroll',()=>{scrollResumeAt=performance.now()+1050;viewportChanged();},{passive:true});
   window.addEventListener('blur',cancel);
   desktop.addEventListener('change',cancel);
 })();
