@@ -1456,11 +1456,13 @@
   }
 
   function withinQuietReach(event,retain=nearAttention) {
-    if(!event||event.target?.closest?.('a, button, summary, input, textarea, select, [contenteditable]'))return false;
+    if(!event)return false;
     const r=canvas.getBoundingClientRect();
-    const dx=Math.max(r.left-event.clientX,event.clientX-r.left-r.width,0);
-    const dy=Math.max(r.top-event.clientY,event.clientY-r.top-r.height,0);
-    return Math.hypot(dx,dy)<=pixelScale*(retain?29:20);
+    if(!r.width||!r.height)return false;
+    // One circle around the visible cat, independent of facing, feather hit
+    // regions and underlying page controls. Looking never intercepts their clicks.
+    const cx=r.left+r.width/2,cy=r.top+r.height/2;
+    return Math.hypot(event.clientX-cx,event.clientY-cy)<=r.width*(retain?1.5:1.25);
   }
   function tickNearAttention(now) {
     const eligible=!!gazePoint && !!cursorPoint && playStarted===null && petStarted===null && tailStarted===null &&
