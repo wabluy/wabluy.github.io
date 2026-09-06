@@ -35,7 +35,8 @@ function animateSection(section, expanded, animate = true) {
   section.open = expanded;
   const to = section.getBoundingClientRect().height;
   if (!animate || sectionReducedMotion.matches || Math.abs(from-to)<1) {
-    section.style.removeProperty('overflow');sectionMotions.delete(section);return;
+    section.style.removeProperty('overflow');sectionMotions.delete(section);
+    section.dispatchEvent(new CustomEvent('sectionmotionstart',{bubbles:true,detail:{duration:0,expanded}}));return;
   }
   section.open = true;
   section.style.height = `${from}px`;section.style.overflow = 'hidden';

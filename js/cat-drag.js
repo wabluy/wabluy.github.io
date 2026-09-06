@@ -46,6 +46,9 @@
   let homeRule=null;
   let state=null,holdTimer=0,lastTick=0,releasingCapture=false,lastHover=null;
   let viewportDirty=false,layoutFollowUntil=0,scrollResumeAt=0;
+  const sectionIds=['projects','publications','news'];
+  let selectedSection=sectionIds.find(id=>document.getElementById(id)?.open)||null;
+  let fallbackAt=0,selectionReadyAt=0;
   function lineRect(element,edge='top') {
     if(!element?.isConnected)return null;
     const r=element.getBoundingClientRect();
@@ -88,11 +91,16 @@
     return !!r && r.y-sy()>=top && r.y-sy()<=innerHeight-8;
   }
   function viewportTarget() {
-    // The desktop sidebar is a separate habitat. Content-lane residents follow
-    // only real section boundaries, never navigation or profile decoration.
-    const sidebarResident=desktop.matches&&(!state||state.target?.id==='home'||
-      (state.mode==='entering'&&!state.excursion));
-    if(sidebarResident&&visibleLine(homeRect()))return {id:'home',element:home};
+    const current=state?.mode==='parked'?state.target:!state?{id:'home',element:home}:null;
+    if(selectedSection) {
+      const target=targets().find(item=>item.id===selectedSection);
+      if(target&&visibleLine(currentLine(target)))return target;
+      // A pending offscreen section may retain the existing default resident,
+      // but must never borrow an unrelated visible separator.
+      return current?.id==='home'&&visibleLine(homeRect())?current:null;
+    }
+    if(performance.now()<fallbackAt)return current&&visibleLine(currentLine(current))?current:null;
+    if(visibleLine(homeRect()))return {id:'home',element:home};
     return targets().filter(item=>!['header','profile'].includes(item.id)&&(!desktop.matches||item.id!=='home'))
       .map(item=>({...item,rect:currentLine(item)}))
       .filter(item=>visibleLine(item.rect))
@@ -134,6 +142,11 @@
     if(state&&state.mode!=='parked'&&state.mode!=='viewport-wait'&&!transferring)return;
     if(api.interacting?.(now))return;
     const target=viewportTarget();
+    if(now<selectionReadyAt){
+      const current=state?.mode==='parked'?currentLine(state.target):!state?homeRect():null;
+      if(!visibleLine(current))waitForViewport();
+      viewportDirty=true;return;
+    }
     const staying=state?.mode==='parked'?state.target:!state?{element:home}:null;
     if(now<scrollResumeAt&&(!staying||staying.element!==target?.element)){
       waitForViewport();viewportDirty=true;return;
@@ -456,7 +469,7 @@
       introCard.dispatchEvent(new Event('catintroenable'));
     }
     state={mode:'entering',start:performance.now(),entryFraction:Math.random()};
-    const target=visibleLine(homeRect())?{id:'home',element:home}:viewportTarget();
+    const target=selectedSection?viewportTarget():visibleLine(homeRect())?{id:'home',element:home}:viewportTarget();
     if(!target){waitForViewport();return;}
     if(target.id!=='home'){state.excursion={target,parked:resident(target)};state.viewportTransfer=true;}
     canvas.style.pointerEvents='none';
@@ -636,7 +649,7 @@
     const dt=Math.min(.05,Math.max(0,(now-lastTick)/1000));lastTick=now;
     // The portrait owns its separator even while the cat is opening the header switch.
     if(state && desktop.matches)homeRect();
-    if(now<=layoutFollowUntil)viewportDirty=true;
+    if(now<=layoutFollowUntil||now<=fallbackAt+32)viewportDirty=true;
     if(!portalWanted&&api.active()&&(!state||state.mode==='parked')&&!state?.platformMotion&&api.grounded?.()!==false){
       returnHome(now,'exiting');
     }
@@ -710,8 +723,15 @@
   }
   api.install({tick,cancel,appear,setVisible,wander,viewportChanged,isAway:()=>!!state,blocksInput:()=>!!state&&(state.mode!=='parked'||!!state.platformMotion)});
   function followSectionMotion(event) {
-    layoutFollowUntil=performance.now()+event.detail.duration+150;viewportChanged();
-    if(state?.mode!=='parked')return;
+    const now=performance.now();
+    const id=sectionIds.find(id=>document.getElementById(id)===event.target);
+    if(id){
+      if(event.detail.expanded){selectedSection=id;fallbackAt=0;}
+      else if(selectedSection===id){selectedSection=null;fallbackAt=now+2000;}
+      selectionReadyAt=now+event.detail.duration+100;
+    }
+    layoutFollowUntil=now+event.detail.duration+150;viewportChanged();
+    if(state?.mode!=='parked'||api.interacting?.(now))return;
     const source=event.target;
     // A section's lower separators move; its own top border stays in place.
     const before=source.getBoundingClientRect(),r=currentLine(state.target);
