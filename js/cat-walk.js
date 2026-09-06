@@ -433,24 +433,27 @@
 
   function drawScared(progress = 1) {
     const tuck = Math.max(0, Math.min(1, progress))*actionWeight;
-    ctx.save();
-    ctx.translate(3 * tuck, 26 * .2 * tuck);
-    ctx.scale(1 - .08 * tuck, 1 - .2 * tuck);
-    body();
-    ctx.restore();
-    // Short paws and a wrapped tail make a compact ball, without stretching the torso.
-    head(-4 * tuck, 3 * tuck, 'aim', tuck);
+    if(tuck<.001){drawWalk(0);return;}
+    const paw=(x,phase,target)=>mixPoint(gaitFoot(x,0,phase),target,tuck);
     poseTail([[12,23],[7,24],[6,22],[6,20],[8,17]],tuck);
-    rect(22, 25, 3, 2, color.cream);
-    rect(28, 25, 3, 2, color.cream);pawEdge(22,26);pawEdge(28,26);
+    groundLeg(mixPoint([11,20],[15,24],tuck),paw(11,.5,[17,26]),true,4);
+    frontLeg(mixPoint([23,20],[24,24],tuck),paw(23,.75,[25,26]),true);
+    ctx.save();ctx.translate(3*tuck,26*.2*tuck);ctx.scale(1-.08*tuck,1-.2*tuck);body();ctx.restore();
+    groundLeg(mixPoint([13,20],[19,24],tuck),paw(13,0,[23,26]),false,4);
+    frontLeg(mixPoint([28,20],[27,24],tuck),paw(28,.25,[29,26]));
+    head(-4*tuck,-1+4*tuck,tuck>.2?'aim':'normal',tuck);
   }
 
   function drawFalling(progress) {
-    tail(0, -1);
+    const spread=actionWeight;
+    if(spread<.001){drawWalk(0);return;}
+    tail(0,-spread);
+    groundLeg([11,20],mixPoint(gaitFoot(11,0,.5),[12,26],spread),true,4);
+    frontLeg([23,20],mixPoint(gaitFoot(23,0,.75),[25,26],spread),true);
     body();
-    head(-1, 0, 'aim', 1);
-    groundLeg([15, 22], [12, 26], true, 4);
-    groundLeg([26, 22], [30, 26], false, 4);
+    groundLeg([13,20],mixPoint(gaitFoot(13,0,0),[12,26],spread),false,4);
+    frontLeg([28,20],mixPoint(gaitFoot(28,0,.25),[30,26],spread));
+    head(-spread,-1+spread,spread>.2?'aim':'normal',spread);
   }
 
   function drawSploot(frame,progress=0) {
@@ -614,7 +617,7 @@
     body(0, lift);
     groundLeg([16, 22 - lift * .67], [15, 26]);
     frontLeg([29, 19], [29, 26]);
-    head(0, Math.round(raised), 'pet');
+    head(0, Math.round(raised), raised>.2?'pet':'normal');
   }
 
   function pouncePose(progress) {
@@ -771,6 +774,7 @@
   }
   const restingActions=new Set(['portal-open','button-tap','stretch','scratch','groom','belly-groom','sploot','belly','pet','tail-enjoy','grab','pounce','yawn','scared']);
   function drawExit(source,progress) {
+    if(progress>=1){actionWeight=1;postureOverride=null;drawWalk(0);return;}
     actionWeight=(source.exitWeight??1)*(1-easePose(progress));
     postureOverride=(easePose(source.progress/.16)*(1-easePose((source.progress-.84)/.16)))*actionWeight;
     if(source.kind==='turn')drawTurn(source.progress+(source.progress<.5?-source.progress:1-source.progress)*easePose(progress));
@@ -812,8 +816,9 @@
       gaitBlend+=Math.max(-step,Math.min(step,target-gaitBlend));
     }
     lastGaitX = currentX;
-    if(!laneMotion && !poseHandoff && lastPose && lastPose.kind!==kind && restingActions.has(lastPose.kind) &&
-      ((lastPose.progress>.12&&lastPose.progress<.88)||(lastPose.kind==='scared'&&lastPose.progress>.1)) && !transportDriver?.blocksInput() && !reducedMotion.matches) {
+    const stablePlatform=!laneMotion||['raised','grooming','compact-settle'].includes(laneMotion.kind);
+    if(stablePlatform && !poseHandoff && lastPose && lastPose.kind!==kind && restingActions.has(lastPose.kind) &&
+      (lastPose.progress>.12||(lastPose.kind==='scared'&&lastPose.progress>.1)) && !transportDriver?.blocksInput() && !reducedMotion.matches) {
       const now=performance.now();poseHandoff={source:lastPose,start:now,last:now};
       return;
     }
@@ -1552,6 +1557,7 @@
       stage.dataset.lane='raised';stage.style.transform=`translate3d(0,${-laneOffset}px,0)`;
     },
     active: () => active,
+    grounded: () => !laneMotion || !['rising','falling','background','landing'].includes(laneMotion.kind),
     interacting: (now = performance.now()) => active && (featherPress !== null || pounceHeld || pendingInput !== null ||
       playStarted !== null || petStarted !== null || tailStarted !== null || now-lastInteractionMove < 200),
     direction: () => turnMotion && turnMotion.progress < .5 ? turnMotion.from : direction,

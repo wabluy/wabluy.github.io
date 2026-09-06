@@ -41,7 +41,8 @@
   const introButton=introCard?.querySelector?.('.pet-toggle');
   let introStarted=null;
   let portalWanted=true;
-  let nextWanderAt=performance.now()+25000;
+  const wanderCooldown=20000;
+  let nextWanderAt=performance.now()+wanderCooldown;
   let homeRule=null;
   let state=null,holdTimer=0,lastTick=0,releasingCapture=false,lastHover=null;
   let viewportDirty=false,viewportChangedAt=0;
@@ -201,11 +202,12 @@
     const fraction=here>(r.width-w)/2?.12+Math.random()*.18:.7+Math.random()*.18;
     returnHome(now);
     state.excursion={target,parked,fraction,sameLine:true};
-    nextWanderAt=now+45000;
+    nextWanderAt=now+wanderCooldown;
     return true;
   }
   function finishArrival(r,goalX,now) {
     const excursion=state?.excursion,elapsed=now-(state?.start||now);
+    nextWanderAt=Math.max(nextWanderAt,now+wanderCooldown);
     if(excursion?.parked) {
       clearDecorations();reserveLine(excursion.target);homeVacant(true);
       state={...excursion.parked,deadline:excursion.parked.deadline+elapsed};
@@ -439,6 +441,7 @@
       const held=state;clearTimeout(holdTimer);holdTimer=0;
       releaseCapture(held.pointerId);restoreOrigin(held);
     }
+    if(api.grounded?.()===false||state?.platformMotion)return;
     restorePrank(state);
     returnHome(performance.now(),'exiting');
   }
@@ -585,6 +588,9 @@
     const dt=Math.min(.05,Math.max(0,(now-lastTick)/1000));lastTick=now;
     // The portrait owns its separator even while the cat is opening the header switch.
     if(state && desktop.matches)homeRect();
+    if(!portalWanted&&api.active()&&(!state||state.mode==='parked')&&!state?.platformMotion&&api.grounded?.()!==false){
+      returnHome(now,'exiting');
+    }
     followViewport(now);
     if(!state){
       if(!hint.hidden&&lastHover){if(api.hitScruff(lastHover))showHint(api.scruffPoint());else hint.hidden=true;}
