@@ -47,8 +47,9 @@
   let state=null,holdTimer=0,lastTick=0,releasingCapture=false,lastHover=null;
   let viewportDirty=false,layoutFollowUntil=0,scrollResumeAt=0;
   const sectionIds=['projects','publications','news'];
-  let selectedSection=sectionIds.find(id=>document.getElementById(id)?.open)||null;
-  let fallbackAt=0,selectionReadyAt=0;
+  let selectedSection=sectionIds.find(id=>window.location?.hash===`#${id}`&&document.getElementById(id)?.open)||null;
+  let fallbackAt=0,selectionReadyAt=0,selectionVersion=0,hoverProtectedUntil=0;
+  let stageScroll={x:sx(),y:sy()},portalScroll={x:sx(),y:sy()};
   function lineRect(element,edge='top') {
     if(!element?.isConnected)return null;
     const r=element.getBoundingClientRect();
@@ -79,7 +80,7 @@
     const result=[];
     for(const item of items){
       const rect=lineRect(item.element,item.edge);
-      if(!rect||result.some(other=>Math.abs(other.rect.y-rect.y)<2&&Math.abs(other.rect.left-rect.left)<2))continue;
+      if(!rect)continue; // Keep semantic identities even while two animated borders overlap.
       result.push({...item,rect});
     }
     return result;
@@ -90,22 +91,27 @@
     const top=Math.max(0,nav?.bottom||0)+width()*.7;
     return !!r && r.y-sy()>=top && r.y-sy()<=innerHeight-8;
   }
+  const standingTarget=()=>state?.mode==='parked'?state.target:!state?{id:'home',element:home}:null;
+  function residentVisible(r) {
+    const nav=document.querySelector('.topbar')?.getBoundingClientRect();
+    return !!r&&r.y-sy()>Math.max(0,nav?.bottom||0)&&r.y-sy()-width()<innerHeight;
+  }
   function viewportTarget() {
-    const current=state?.mode==='parked'?state.target:!state?{id:'home',element:home}:null;
+    const current=standingTarget();
     if(selectedSection) {
       const target=targets().find(item=>item.id===selectedSection);
-      if(target&&visibleLine(currentLine(target)))return target;
-      // A pending offscreen section may retain the existing default resident,
-      // but must never borrow an unrelated visible separator.
-      return current?.id==='home'&&visibleLine(homeRect())?current:null;
+      // Residence survives visibility changes. Only a different, usable destination moves it.
+      if(target&&(current?.element===target.element||visibleLine(currentLine(target))))return target;
+      return current;
     }
-    if(performance.now()<fallbackAt)return current&&visibleLine(currentLine(current))?current:null;
-    if(visibleLine(homeRect()))return {id:'home',element:home};
+    if(performance.now()<fallbackAt)return current;
+    if((current?.id==='home'&&residentVisible(homeRect()))||visibleLine(homeRect()))return {id:'home',element:home};
+    if(current&&residentVisible(currentLine(current)))return current;
     return targets().filter(item=>!['header','profile'].includes(item.id)&&(!desktop.matches||item.id!=='home'))
-      .map(item=>({...item,rect:currentLine(item)}))
-      .filter(item=>visibleLine(item.rect))
-      .sort((a,b)=>b.rect.y-a.rect.y)[0]||null;
+      .map(item=>({...item,rect:currentLine(item)})).filter(item=>visibleLine(item.rect))
+      .sort((a,b)=>b.rect.y-a.rect.y)[0]||current;
   }
+  function protectInteraction(now) { return now<hoverProtectedUntil||api.interacting?.(now); }
   function waitForViewport() {
     clearDecorations();reserveLine(null);homeVacant(true);api.pause();
     state={mode:'viewport-wait'};
@@ -116,52 +122,62 @@
   }
   function enterViewport(target,now) {
     clearDecorations();reserveLine(null);api.pause();
-    state={mode:'entering',start:now,viewportTransfer:true,entryFraction:Math.random(),
+    state={mode:'entering',start:now,viewportTransfer:true,selectionVersion,entryFraction:Math.random(),
       excursion:{target,parked:resident(target)}};
     canvas.style.opacity='0';canvas.style.pointerEvents='none';
   }
   function portalTo(target,now,follow=false) {
     const origin=currentLine(state?.target||{id:'home',element:home});
-    if(follow&&!visibleLine(origin)){enterViewport(target,now);return;}
+    if(follow&&!residentVisible(origin)){enterViewport(target,now);return;}
     returnHome(now);
     // A transported sprite may still have its previous frame's screen position
     // immediately after scrolling. Anchor departure to the real document line.
     if(origin)state.from.y=origin.y+width()*.025;
     state.excursion={target,parked:resident(target),fraction:.2+Math.random()*.6};
-    if(follow)state.viewportTransfer=true;
+    if(follow){state.viewportTransfer=true;state.selectionVersion=selectionVersion;}
+  }
+  function rebaseLayers() {
+    if(state&&['arming','dragging','intro','prank'].includes(state.mode))return;
+    if(state?.mode==='parked') {
+      const r=currentLine(state.target);if(r)setLine(r);
+    } else if(state&&stage.dataset.transported==='true') {
+      for(const [key,delta] of [['left',stageScroll.x-sx()],['top',stageScroll.y-sy()]]){
+        const value=parseFloat(stage.style[key]);if(Number.isFinite(value))stage.style[key]=`${value+delta}px`;
+      }
+      stageScroll={x:sx(),y:sy()};
+    }
+    for(const node of [hole,portalCanvas,portalBack])for(const [key,delta] of [['left',portalScroll.x-sx()],['top',portalScroll.y-sy()]]){
+      const value=parseFloat(node.style[key]);if(Number.isFinite(value))node.style[key]=`${value+delta}px`;
+    }
+    portalScroll={x:sx(),y:sy()};
   }
   function viewportChanged() {
     viewportDirty=true;
-    if(!state||['arming','dragging','landing','intro','prank'].includes(state.mode))return;
-    // Fixed transport layers must not retain the previous scroll frame's pixels.
-    canvas.style.opacity='0';hole.hidden=portalCanvas.hidden=portalBack.hidden=true;
+    // Reposition existing pixels with their document anchors, without destroying residence.
+    rebaseLayers();
   }
   function followViewport(now) {
     if(!portalWanted||!api.active()||state?.platformMotion||!viewportDirty)return;
     const transferring=state&&['entering','returning'].includes(state.mode);
     if(state&&state.mode!=='parked'&&state.mode!=='viewport-wait'&&!transferring)return;
-    if(api.interacting?.(now))return;
-    const target=viewportTarget();
-    if(now<selectionReadyAt){
-      const current=state?.mode==='parked'?currentLine(state.target):!state?homeRect():null;
-      if(!visibleLine(current))waitForViewport();
-      viewportDirty=true;return;
-    }
-    const staying=state?.mode==='parked'?state.target:!state?{element:home}:null;
-    if(now<scrollResumeAt&&(!staying||staying.element!==target?.element)){
-      waitForViewport();viewportDirty=true;return;
-    }
-    viewportDirty=false;
-    if(!target){waitForViewport();return;}
-    const current=transferring?(state.excursion?.target||{id:'home',element:home}):
-      state?.target||{id:'home',element:home};
-    if(state?.mode!=='viewport-wait'&&current.element===target.element){
-      if(state?.mode==='parked'){setLine(currentLine(current));canvas.style.opacity='1';}
+    if(protectInteraction(now))return;
+    if(transferring) {
+      // Once paws have emerged, finish landing before handling another selection.
+      // The portal renderer can update a stale destination only while fully inside.
+      if(state.selectionVersion!==selectionVersion)viewportDirty=true;
       return;
     }
-    // Scrolling changes the visible habitat immediately; do not play a departure
-    // on a source that the reader has already moved away from.
-    enterViewport(target,now);
+    const target=viewportTarget(),current=standingTarget();
+    if(current&&current.element===target?.element){
+      viewportDirty=now<selectionReadyAt||now<fallbackAt;
+      return;
+    }
+    if(now<Math.max(selectionReadyAt,scrollResumeAt)){viewportDirty=true;return;}
+    // A manual placement owns its existing grace period, even if layout changes.
+    if(state?.mode==='parked'&&!state.viewportFollow&&now<state.deadline)return;
+    if(!target||!visibleLine(currentLine(target))) {viewportDirty=false;return;}
+    viewportDirty=false;
+    if(current)portalTo(target,now,true);else enterViewport(target,now);
   }
 
   function nearbyControl(point) {
@@ -189,11 +205,16 @@
     Object.assign(hint.style,{left:`${point.x}px`,top:`${point.y}px`,background:`conic-gradient(#dda16d ${progress*360}deg,transparent 0)`});
   }
   function externalBox(left,top,w,h) {
+    stageScroll={x:sx(),y:sy()};stage.style.removeProperty('clip-path');
     Object.assign(stage.style,{position:'fixed',insetInline:'auto',right:'auto',bottom:'auto',left:`${left-sx()}px`,top:`${top-sy()}px`,width:`${w}px`,height:`${h}px`,transform:'none'});
     stage.dataset.transported='true';home.dataset.away='true';
   }
   function setLine(r) {
     const w=width();externalBox(r.left,r.y-w*.7,r.width,w*.7);canvas.style.removeProperty('bottom');
+    canvas.style.opacity=residentVisible(r)?'1':'0';
+    const nav=document.querySelector('.topbar')?.getBoundingClientRect();
+    const crop=Math.max(0,(nav?.bottom||0)-(r.y-sy()-w*.7));
+    stage.style.clipPath=`inset(${crop}px -120px -120px -120px)`;
   }
   function floatCat(left,bottom,kind,frame=0,progress=0,distance=0,facing=1) {
     const w=width(),h=kind==='carried'||kind==='portal-open'?w:w*.7;
@@ -202,6 +223,7 @@
   }
   function clearDecorations() {
     guide.hidden=hint.hidden=hole.hidden=portalCanvas.hidden=portalBack.hidden=true;
+    stage.style.removeProperty('clip-path');
     canvas.style.pointerEvents='auto';
     document.documentElement.classList.remove('cat-carrying','cat-handling');
     canvas.style.removeProperty('clip-path');canvas.style.removeProperty('opacity');
@@ -248,7 +270,7 @@
     if(now<nextWanderAt||!portalWanted||api.reduced()||api.interacting?.(now)||
       (state&&state.mode!=='parked')||state?.platformMotion)return false;
     const parked=state?{...state}:null,target=parked?.target||{id:'home',element:home};
-    const r=currentLine(target),w=width();if(!r||r.width<w*1.6)return false;
+    const r=currentLine(target),w=width();if(!visibleLine(r)||r.width<w*1.6||protectInteraction(now)||viewportDirty)return false;
     const here=canvas.getBoundingClientRect().left+sx()-r.left;
     const fraction=here>(r.width-w)/2?.12+Math.random()*.18:.7+Math.random()*.18;
     returnHome(now);
@@ -258,6 +280,7 @@
   }
   function finishArrival(r,goalX,now) {
     const excursion=state?.excursion,elapsed=now-(state?.start||now);
+    viewportDirty=true;
     nextWanderAt=Math.max(nextWanderAt,now+wanderCooldown);
     if(excursion?.parked) {
       clearDecorations();reserveLine(excursion.target);homeVacant(true);
@@ -420,6 +443,7 @@
     ink.restore();
   }
   function showHole(x,y,progress,seconds=0,fade=1,frontRight=true,startAngle=-Math.PI/2,traceFacing=1,size=1) {
+    portalScroll={x:sx(),y:sy()};
     const w=width()*size;hole.hidden=false;
     Object.assign(hole.style,{left:`${x-sx()}px`,top:`${y-sy()}px`,width:`${w*.5}px`,height:`${w*.92}px`,transform:'translate(-50%,-100%)'});
     hole.style.setProperty?.('--cat-portal-aperture',String(smooth(clamp((progress-.35)/.65,0,1))*fade));
@@ -538,11 +562,11 @@
   }
   function tickPortal(now) {
     const elapsed=Math.max(0,now-state.start)+(state.mode==='entering'?portalExit:0);
-    // While fully inside a gate, follow the latest visible destination safely.
-    if(state.viewportTransfer && now-state.start<(state.mode==='entering'?portalTiming.open:portalExit+portalTiming.open) &&
-      !visibleLine(state.excursion?currentLine(state.excursion.target):homeRect())) {
+    // Selection changes may replace an exit only after the cat is fully inside.
+    if(state.viewportTransfer&&elapsed>=portalExit&&!state.arrivalVisible&&state.selectionVersion!==selectionVersion) {
       const target=viewportTarget();
-      if(target)state.excursion={target,parked:resident(target),fraction:state.excursion?.fraction??.5};
+      if(!target||now<Math.max(selectionReadyAt,scrollResumeAt)){waitForViewport();viewportDirty=true;return;}
+      enterViewport(target,now);tickPortal(now);return;
     }
     let r=state.excursion?currentLine(state.excursion.target):homeRect();
     if(!r&&state.excursion){delete state.excursion;r=homeRect();}
@@ -689,7 +713,7 @@
       const r=currentLine(state.target);
       if(!r){returnHome(now);return true;}
       // Human interaction takes precedence, even on the frame the old timer expires.
-      if(api.interacting?.(now)) {
+      if(protectInteraction(now)) {
         state.interacting=true;
         state.returnDelay=5000;
         state.deadline=Infinity;
@@ -697,12 +721,13 @@
         state.interacting=false;
         state.deadline=state.viewportFollow?Infinity:now+5000;
       }
-      const returnTarget=state.returnTarget||{id:'home',element:home};
+      const returnTarget=(selectedSection&&targets().find(item=>item.id===selectedSection))||state.returnTarget||{id:'home',element:home};
+      if(!state.viewportFollow&&now>=state.deadline&&returnTarget.element===state.target.element){state.viewportFollow=true;state.deadline=Infinity;}
       if(!state.viewportFollow&&now>=state.deadline&&visibleLine(r)&&visibleLine(currentLine(returnTarget))){
         if(returnTarget.id==='home')returnHome(now);else portalTo(returnTarget,now);
         return true;
       }
-      setLine(r);canvas.style.opacity='1';
+      setLine(r);
       if(state.platformMotion) {
         const motion=state.platformMotion,elapsed=now-motion.start;
         if(elapsed < motion.duration) {
@@ -721,17 +746,32 @@
     if(['returning','entering','exiting'].includes(state.mode)){tickPortal(now);return true;}
     return false;
   }
-  api.install({tick,cancel,appear,setVisible,wander,viewportChanged,isAway:()=>!!state,blocksInput:()=>!!state&&(state.mode!=='parked'||!!state.platformMotion)});
+  function suspend() {
+    hoverProtectedUntil=0;lastHover=null;
+    if(state&&['arming','dragging'].includes(state.mode))release({pointerId:state.pointerId},true);
+    if(state?.mode==='prank')restorePrank(state);
+  }
+  function resumeVisibility(delta) {
+    nextWanderAt+=delta;lastTick=performance.now();
+    for(const item of [state,state?.platformMotion,state?.destinationSample,state?.excursion?.parked,homeRule])if(item){
+      for(const key of ['start','deadline','time','gateWaitStart'])if(Number.isFinite(item[key]))item[key]+=delta;
+    }
+    if(fallbackAt)fallbackAt+=delta;if(selectionReadyAt)selectionReadyAt+=delta;
+    if(layoutFollowUntil)layoutFollowUntil+=delta;scrollResumeAt=0;
+    viewportChanged();
+  }
+  api.install({tick,cancel,appear,setVisible,wander,viewportChanged,suspend,resumeVisibility,isAway:()=>!!state,blocksInput:()=>!!state&&(state.mode!=='parked'||!!state.platformMotion)});
   function followSectionMotion(event) {
     const now=performance.now();
     const id=sectionIds.find(id=>document.getElementById(id)===event.target);
     if(id){
+      selectionVersion++;
       if(event.detail.expanded){selectedSection=id;fallbackAt=0;}
-      else if(selectedSection===id){selectedSection=null;fallbackAt=now+2000;}
+      else if(selectedSection===id){selectedSection=null;fallbackAt=now+event.detail.duration+2000;}
       selectionReadyAt=now+event.detail.duration+100;
     }
     layoutFollowUntil=now+event.detail.duration+150;viewportChanged();
-    if(state?.mode!=='parked'||api.interacting?.(now))return;
+    if(state?.mode!=='parked'||protectInteraction(now))return;
     const source=event.target;
     // A section's lower separators move; its own top border stays in place.
     const before=source.getBoundingClientRect(),r=currentLine(state.target);
@@ -775,12 +815,13 @@
   canvas.addEventListener('lostpointercapture',event=>{if(!releasingCapture)release(event,true);});
   canvas.addEventListener('contextmenu',event=>{if(state&&['arming','dragging'].includes(state.mode))event.preventDefault();});
   document.addEventListener('pointermove',event=>{
+    if(event.pointerType==='mouse'&&(!lastHover||event.clientX!==lastHover.clientX||event.clientY!==lastHover.clientY)&&api.canLift?.(event))hoverProtectedUntil=performance.now()+400;
     lastHover=event;
     if(state&&state.mode!=='parked')return;
     if(event.pointerType==='mouse'&&!event.buttons&&api.hitScruff(event))showHint(api.scruffPoint());else hint.hidden=true;
   },{passive:true});
   document.addEventListener('keydown',event=>{if(event.key==='Escape'&&state){event.preventDefault();event.stopImmediatePropagation();cancel();}},true);
   window.addEventListener('scroll',()=>{scrollResumeAt=performance.now()+1050;viewportChanged();},{passive:true});
-  window.addEventListener('blur',cancel);
-  desktop.addEventListener('change',cancel);
+  window.addEventListener('blur',()=>{hoverProtectedUntil=0;lastHover=null;if(state&&['arming','dragging','prank'].includes(state.mode))cancel();});
+  desktop.addEventListener('change',()=>{if(state&&['arming','dragging'].includes(state.mode))release({pointerId:state.pointerId},true);viewportChanged();});
 })();

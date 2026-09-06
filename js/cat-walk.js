@@ -48,7 +48,7 @@
   let pendingCompactTension = false;
   const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
   let active = false;
-  let frameRequest = 0;
+  let frameRequest = 0, visibilityPauseAt = null;
   let stillTimer = 0;
   let startedAt = 0;
   let lastPaint = -Infinity;
@@ -1010,6 +1010,7 @@
   }
 
   function stop() {
+    visibilityPauseAt=null;
     featherPress=null;
     transportDriver?.cancel();
     poseHandoff=null;lastPose=null;liftOrigin=null;gaitBlend=0;gaitPaintAt=0;
@@ -1040,7 +1041,8 @@
   function tick(now) {
     frameRequest = 0;
     if (!active) return;
-    if (document.hidden || !stage.isConnected || !pet.isConnected) { stop(); return; }
+    if(document.hidden){suspendVisibility();return;}
+    if (!stage.isConnected || !pet.isConnected) { stop(); return; }
     if (transportDriver?.tick(now)) { if (active && !frameRequest) frameRequest = requestAnimationFrame(tick); return; }
     if (reducedMotion.matches) { if (transportDriver?.isAway()) frameRequest = requestAnimationFrame(tick); return; }
     if (featherPress && !featherPress.charged) {
@@ -1670,11 +1672,29 @@
     if (laneMotion) { resetLane(); if (active) beginWalkAway(performance.now()); }
   });
   if (pet.dataset.interacting === 'true') activate();
-  document.addEventListener('visibilitychange', () => {
-    if (document.hidden) stop();
-    else if (pet.dataset.interacting === 'true') activate();
-  });
-  window.addEventListener('pagehide', stop);
+  function suspendVisibility() {
+    if(!active||visibilityPauseAt!==null)return;
+    visibilityPauseAt=performance.now();
+    cancelAnimationFrame(frameRequest);frameRequest=0;
+    cursorPoint=null;stroke=null;clearCursor();
+    transportDriver?.suspend?.();
+  }
+  function resumeVisibility() {
+    if(visibilityPauseAt===null){if(pet.dataset.interacting==='true')activate();return;}
+    const now=performance.now(),delta=now-visibilityPauseAt;
+    const shift=t=>t===null?t:t+delta;
+    startedAt+=delta;lastPaint+=delta;gaitPaintAt+=delta;followTime=now;
+    playStarted=shift(playStarted);petStarted=shift(petStarted);tailStarted=shift(tailStarted);
+    for(const motion of [laneMotion,walkAway,turnMotion,poseHandoff,featherPress])if(motion){
+      for(const key of ['start','last','lastTick','lastTime'])if(Number.isFinite(motion[key]))motion[key]+=delta;
+    }
+    lastInteractionMove=-Infinity;visibilityPauseAt=null;
+    transportDriver?.resumeVisibility?.(delta);
+    if(active&&!frameRequest)frameRequest=requestAnimationFrame(tick);
+  }
+  document.addEventListener('visibilitychange',()=>{if(document.hidden)suspendVisibility();else resumeVisibility();});
+  window.addEventListener('pagehide',event=>{if(event.persisted)suspendVisibility();else stop();});
+  window.addEventListener('pageshow',event=>{if(event.persisted)resumeVisibility();});
   reducedMotion.addEventListener('change', () => {
     stop();
     if (pet.dataset.interacting === 'true') activate();
