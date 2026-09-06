@@ -24,7 +24,7 @@
 
   const color = {
     outline: '#805039', orange: '#c58049', light: '#dda16d',
-    stripe: '#a46136', cream: '#f6eee3', eye: '#171614', pink: '#d8aaa6', tooth: '#fffaf0'
+    stripe: '#a46136', cream: '#f6eee3', eye: '#171614', pink: '#d8aaa6', tooth: '#fffaf0', mouth: '#b09485'
   };
   // Separate pixel prop keeps the cat's original sprite size and layout intact.
   const treat = document.createElement('canvas');
@@ -144,6 +144,7 @@
   let featherFollowing = false;
   let lastFeatherMotion=-Infinity;
   let followTime = 0;
+  let nearAttention=false,nearLast=0;
   let tailRoot = { x: 11, y: 21 };
   let petTimer = 0;
   let headRegion = { left: 20, right: 40, top: 3, bottom: 23 };
@@ -385,11 +386,11 @@
       }
     }
     if (!(expression === 'yawn' && mouth > 0)) {
-      // Join the two small lobes along their lower edges. Diagonal-only pixels
-      // looked like five detached dots after downsampling to the actual cat size.
+      // A quiet warm-gray mouth line stays separate from the orange marking
+      // on the left muzzle. The clean right cheek must not read as a second stain.
       inkLine([[29 + dx,18 + dy],[29 + dx,19 + dy],[30 + dx,19 + dy],
-        [31 + dx,18 + dy],[32 + dx,19 + dy],[33 + dx,19 + dy],[33 + dx,18 + dy]],color.outline);
-      box(31 + dx,18 + dy,1,1,color.outline);
+        [31 + dx,18 + dy],[32 + dx,19 + dy],[33 + dx,19 + dy],[33 + dx,18 + dy]],color.mouth);
+      box(31 + dx,18 + dy,1,1,color.mouth);
     }
     ctx.restore();
   }
@@ -456,15 +457,15 @@
     const stretch=poseLevel(progress);
     // A slow play-bow: planted hind paws, rounded raised hips and reaching forepaws.
     poseTail([[12,18],[7,16],[5,12],[6,8],[8,7]],stretch);
-    groundLeg(mixPoint([11,20],[12,18],stretch),mixPoint(gaitFoot(11,0,.5),[11,26],stretch),true,4.5);
-    softForeleg(mixPoint([23,20],[23,21],stretch),mixPoint([23,23],[27,24],stretch),mixPoint(gaitFoot(23,0,.75),[32,26],stretch),true);
+    groundLeg(mixPoint([11,20],[12,18],stretch),mixPoint(restFoot(11),[11,26],stretch),true,4.5);
+    softForeleg(mixPoint([23,20],[23,21],stretch),mixPoint([23,23],[27,24],stretch),mixPoint(restFoot(23),[32,26],stretch),true);
     poseBody([[8,17],[10,13],[14,11],[18,13],[22,17],[26,20],[29,23],[28,26],[23,26],[18,23],[14,21],[10,21],[7,19]],
       [[9,17],[11,14],[14,12],[17,14],[21,18],[25,21],[28,24],[27,25],[23,25],[18,22],[14,20],[10,20],[8,19]],
       [[15,19],[20,20],[26,23],[28,25],[22,25],[18,22]],stretch);
-    groundLeg(mixPoint([13,20],[15,18],stretch),mixPoint(gaitFoot(13,0),[15,26],stretch),false,4.5);
+    groundLeg(mixPoint([13,20],[15,18],stretch),mixPoint(restFoot(13),[15,26],stretch),false,4.5);
     // The shoulder stays inside the lowered chest; the elbow unfolds along the floor.
     // Draw the arm before the head so the cheek overlaps its root, not vice versa.
-    const paw=mixPoint(gaitFoot(28,0,.25),[36,26],stretch);
+    const paw=mixPoint(restFoot(28),[36,26],stretch);
     softForeleg(mixPoint([28,20],[24.5,21.5],stretch),
       mixPoint([28,23],[29,24.5],stretch),paw);
     head(-stretch,-1+3.5*stretch,stretch>.35?'content':'normal');
@@ -525,8 +526,8 @@
 
   function drawScared(progress = 1) {
     const tuck = Math.max(0, Math.min(1, progress))*actionWeight;
-    if(tuck<.001){drawWalk(0);return;}
-    const paw=(x,phase,target)=>mixPoint(gaitFoot(x,0,phase),target,tuck);
+    if(tuck<.001){drawStanding();return;}
+    const paw=(x,phase,target)=>mixPoint(restFoot(x),target,tuck);
     poseTail([[12,23],[7,24],[6,22],[6,20],[8,17]],tuck);
     groundLeg(mixPoint([11,20],[15,24],tuck),paw(11,.5,[17,26]),true,4);
     frontLeg(mixPoint([23,20],[24,24],tuck),paw(23,.75,[25,26]),true);
@@ -538,13 +539,13 @@
 
   function drawFalling(progress) {
     const spread=actionWeight;
-    if(spread<.001){drawWalk(0);return;}
+    if(spread<.001){drawStanding();return;}
     tail(0,-spread);
-    groundLeg([11,20],mixPoint(gaitFoot(11,0,.5),[12,26],spread),true,4);
-    frontLeg([23,20],mixPoint(gaitFoot(23,0,.75),[25,26],spread),true);
+    groundLeg([11,20],mixPoint(restFoot(11),[12,26],spread),true,4);
+    frontLeg([23,20],mixPoint(restFoot(23),[25,26],spread),true);
     body();
-    groundLeg([13,20],mixPoint(gaitFoot(13,0,0),[12,26],spread),false,4);
-    frontLeg([28,20],mixPoint(gaitFoot(28,0,.25),[30,26],spread));
+    groundLeg([13,20],mixPoint(restFoot(13),[12,26],spread),false,4);
+    frontLeg([28,20],mixPoint(restFoot(28),[30,26],spread));
     head(-spread,-1+spread,spread>.2?'aim':'normal',spread);
   }
 
@@ -571,16 +572,16 @@
       if(roll>.7)rect(end[0],end[1],1,1,color.pink);
     };
     poseTail([[11,23],[8,24],[6,25],[4,24],[3,23]],side);
-    paw([12,22],[11,20-3*roll],[12,22-7*roll+curl],[11,20],gaitFoot(11,0,.5),true);
-    paw([24,21],[25,22-5*roll],[27,24-9*roll-curl],[23,20],gaitFoot(23,0,.75),true,true);
+    paw([12,22],[11,20-3*roll],[12,22-7*roll+curl],[11,20],restFoot(11),true);
+    paw([24,21],[25,22-5*roll],[27,24-9*roll-curl],[23,20],restFoot(23),true,true);
     const blend=(a,b)=>mixContour(a,b,roll);
     poseBody(blend([[7,22],[10,18],[17,17],[25,19],[29,23],[26,26],[10,26]],[[7,22],[10,17],[17,15],[25,17],[29,22],[26,26],[10,26]]),
       blend([[8,22],[11,19],[17,18],[24,20],[28,23],[25,25],[11,25]],[[8,22],[11,18],[17,16],[24,18],[28,22],[25,25],[11,25]]),
       blend([[12,24],[15,22],[21,22],[25,23],[23,25],[13,25]],[[11,21],[15,18],[21,18],[25,21],[23,25],[12,25]]),side);
     // Settle onto one shoulder, then expose the belly; the head never spins upside down.
     head(-2*side,3*side,side>.3?'content':'normal',0,.32*roll);
-    paw([13,23],[14,22],[16,23-2*roll-curl],[13,20],gaitFoot(13,0,0),false);
-    paw([25,22],[26,21],[28,23-3*roll+curl],[28,20],gaitFoot(28,0,.25),false,true);
+    paw([13,23],[14,22],[16,23-2*roll-curl],[13,20],restFoot(13),false);
+    paw([25,22],[26,21],[28,23-3*roll+curl],[28,20],restFoot(28),false,true);
   }
 
   function sprintPose(distance) {
@@ -597,14 +598,26 @@
     return { phase, lift, arch, stretch, feet: [foot(11,.5),foot(23,0),foot(13,.43),foot(28,-.07)] };
   }
 
-  function drawSprint(distance,blend=1) {
+  const standingFeet=[[11,26],[23,26],[15,26],[28,26]];
+  const restFoot=x=>[x===13?15:x,26];
+  function locomotionPose(distance,blend=1,settle=0) {
     const pose=sprintPose(distance),phase=pose.phase;
     const walkLoad=.2*(1-Math.cos(distance/(4/.65)*Math.PI*4))/2;
     const lift=pose.lift*blend+walkLoad*(1-blend),arch=pose.arch*blend,stretch=pose.stretch*blend;
     const hipShift=-12*stretch;
     const walking=[gaitFoot(11,distance,.5),gaitFoot(23,distance,.75),gaitFoot(13,distance,0),gaitFoot(28,distance,.25)];
-    const feet=pose.feet.map((foot,i)=>mixPoint(walking[i],foot,blend));
-    ctx.save();ctx.translate(hipShift,0);tail(lift-arch*.4,Math.sin(phase*Math.PI*2)*.5);ctx.restore();
+    const movingFeet=pose.feet.map((foot,i)=>mixPoint(walking[i],foot,blend));
+    // Finish a step by lowering its actual paws, not by fast-forwarding a whole
+    // stride in place. Starting again grows naturally out of the planted stance.
+    const planted=Math.max(settle,1-easePose(Math.max(0,distance)/1.8));
+    return {lift:lift*(1-planted),arch:arch*(1-planted),stretch:stretch*(1-planted),
+      hipShift:hipShift*(1-planted),sway:Math.sin(phase*Math.PI*2)*.5*(1-planted),
+      feet:movingFeet.map((foot,i)=>mixPoint(foot,standingFeet[i],planted))};
+  }
+  function drawStanding(){drawSprint(0,0,1);}
+  function drawSprint(distance,blend=1,settle=0) {
+    const {lift,arch,stretch,hipShift,sway,feet}=locomotionPose(distance,blend,settle);
+    ctx.save();ctx.translate(hipShift,0);tail(lift-arch*.4,sway);ctx.restore();
     groundLeg([11+hipShift,20+lift-arch],feet[0],true,4);
     frontLeg([23,20+lift],feet[1],true);
     body(lift,arch,stretch);
@@ -627,7 +640,7 @@
     const mix=(a,b)=>a+(b-a)*amount;
     const localX=x=>progress<.5?x:40-x;
     const roots=[[11,20],[23,20],[13,20],[28,20]],depth=[-3,-3,4,4];
-    const starts=[gaitFoot(11,0,.5),gaitFoot(23,0,.75),gaitFoot(13,0,0),gaitFoot(28,0,.25)];
+    const starts=standingFeet;
     const windows=[[.04,.72],[.06,.44],[.30,.92],[.47,.98]];
     const feet=starts.map((foot,i)=>{
       const q=Math.max(0,Math.min(1,(progress-windows[i][0])/(windows[i][1]-windows[i][0])));
@@ -776,19 +789,20 @@
     ctx.save();const previousRasterTop=rasterTop;
     if(spriteHeight===40){ctx.translate(0,12);rasterTop=-12;}
     const gesture=portalGesture(progress),rise=gesture.upright*actionWeight;
+    if(rise<.0001){drawStanding();rasterTop=previousRasterTop;ctx.restore();return;}
     // Rear paws remain planted. The hips support an upright chest while one
     // foreleg traces the circle; the torso never orbits the aperture.
     poseTail([[12,22],[8,24],[4,23],[3,19],[4,16]],rise);
     groundLeg(mixPoint([11,20],[13,22],rise),[11,26],true,4);
     const farShoulder=mixPoint([23,20],[22,13],rise);
-    frontLeg(farShoulder,mixPoint(gaitFoot(23,0,.75),[24,18],rise),true);
+    frontLeg(farShoulder,mixPoint(standingFeet[1],[24,18],rise),true);
     poseBody([[9,22],[11,18],[16,15],[18,10],[22,8],[26,10],[27,15],[24,21],[22,25],[13,26],[9,24]],
       [[10,22],[12,19],[17,16],[19,11],[22,9],[25,11],[26,15],[23,21],[21,24],[13,25],[10,24]],
       [[19,12],[23,11],[25,14],[23,20],[20,23],[16,23],[17,19]],rise);
-    groundLeg(mixPoint([13,20],[17,23],rise),[15,26],false,4.5);
+    groundLeg(mixPoint([13,20],[17,23],rise),standingFeet[2],false,4+.5*rise);
     head(-6*rise,-5*rise,'normal');
     const shoulder=mixPoint([28,20],[26,13],rise);
-    const paw=mixPoint(gaitFoot(28,0,.25),gesture.paw,rise);
+    const paw=mixPoint(standingFeet[3],gesture.paw,rise);
     const dx=paw[0]-shoulder[0],dy=paw[1]-shoulder[1],distance=Math.hypot(dx,dy)||1;
     const bone=3+(6.2-3)*rise,bend=Math.sqrt(Math.max(0,bone*bone-distance*distance/4));
     const elbow=[(shoulder[0]+paw[0])/2-dy/distance*bend,(shoulder[1]+paw[1])/2+dx/distance*bend];
@@ -869,7 +883,7 @@
     else if (kind === 'stretch') drawStretch(frame, progress);
     else if (kind === 'groom') drawGroom(frame, progress);
     else if (kind === 'belly-groom') drawGroom(frame, progress, true);
-    else if (kind === 'idle') drawWalk(0);
+    else if (kind === 'idle') drawStanding();
     else if(kind==='walk')drawSprint(gaitDistance,gaitBlend);
     else drawWalk(gaitDistance);
   }
@@ -878,14 +892,13 @@
     const previousGaze=[gazeX,gazeY,gazeFocus];
     if(source.gaze){const weight=1-easePose(progress);gazeX=source.gaze[0]*weight;gazeY=source.gaze[1]*weight;gazeFocus=(source.gaze[2]||0)*weight;}
     try {
-    if(progress>=1){actionWeight=1;postureOverride=null;drawWalk(0);return;}
+    if(progress>=1){actionWeight=1;postureOverride=null;drawStanding();return;}
     actionWeight=(source.exitWeight??1)*(1-easePose(progress));
     postureOverride=(easePose(source.progress/.16)*(1-easePose((source.progress-.84)/.16)))*actionWeight;
     if(source.kind==='turn')drawTurn(source.progress+(source.progress<.5?-source.progress:1-source.progress)*easePose(progress));
     else if(['walk','chase','sprint'].includes(source.kind)) {
-      const cycle=4/.65,d=source.distance||0,ease=easePose(progress);
-      drawSprint(d+(Math.ceil(d/cycle)*cycle-d)*ease,(source.gaitBlend??0)*(1-ease));
-    } else if(source.kind==='idle')drawWalk(0);
+      drawSprint(source.distance||0,source.gaitBlend??0,easePose(progress));
+    } else if(source.kind==='idle')drawStanding();
     else drawAction(source.kind,source.frame,source.progress);
     actionWeight=1;postureOverride=null;
     } finally {[gazeX,gazeY,gazeFocus]=previousGaze;}
@@ -895,12 +908,12 @@
     const handoff=poseHandoff,dt=Math.max(0,now-handoff.last);handoff.last=now;
     startedAt+=dt;if(playStarted!==null)playStarted+=dt;if(petStarted!==null)petStarted+=dt;if(tailStarted!==null)tailStarted+=dt;
     if(walkAway)walkAway.start+=dt;if(laneMotion)laneMotion.start+=dt;
-    if(turnMotion){turnMotion.start+=dt;turnMotion.lastTick=now;}followTime=now;
+    if(turnMotion){turnMotion.start+=dt;turnMotion.lastTick=now;}followTime=now;if(nearAttention)nearLast=now;
     const p=Math.min(1,(now-handoff.start)/220);
     ctx.clearRect(0,0,canvas.width,canvas.height);drawExit(handoff.source,p);
     lastPose={...handoff.source,gaze:handoff.source.gaze?.map(v=>v*(1-easePose(p))),exitWeight:(handoff.source.exitWeight??1)*(1-easePose(p))};
     stage.dataset.transition='settling';
-    if(p>=1){poseHandoff=null;lastPose=null;delete stage.dataset.transition;lastPaint=-Infinity;}
+    if(p>=1){poseHandoff=null;lastPose=null;gaitDistance=0;lastGaitX=currentX;gaitBlend=0;gaitPaintAt=now;delete stage.dataset.transition;lastPaint=-Infinity;}
     return true;
   }
 
@@ -1111,6 +1124,7 @@
 
   function stop() {
     resetGaze(true);
+    nearAttention=false;
     visibilityPauseAt=null;
     featherPress=null;
     transportDriver?.cancel();
@@ -1190,11 +1204,12 @@
       canvas.style.transform = `translate3d(${currentX}px,0,0) scaleX(${direction})`;
       startInput(input.kind, input.event, now);
     }
+    if (tickNearAttention(now)) { frameRequest = requestAnimationFrame(tick); return; }
     if (tickFeatherFollow(now)) { frameRequest = requestAnimationFrame(tick); return; }
     if (walkAway !== null) {
       const elapsed = Math.max(0, now - walkAway.start);
       const progress = Math.min(1, elapsed / 3000);
-      if (now - lastPaint >= 1000 / (Math.hypot(gazeX,gazeY)>.001?60:30) - .5) {
+      if (now - lastPaint >= 1000 / 60 - .5) {
         lastPaint = now;
         currentX = walkAway.from + (walkAway.to - walkAway.from) * progress;
         canvas.style.transform = `translate3d(${currentX}px,0,0) scaleX(${direction})`;
@@ -1440,6 +1455,37 @@
     return Math.max(0, Math.min(travel, target));
   }
 
+  function withinQuietReach(event,retain=nearAttention) {
+    if(!event||event.target?.closest?.('a, button, summary, input, textarea, select, [contenteditable]'))return false;
+    const r=canvas.getBoundingClientRect();
+    const dx=Math.max(r.left-event.clientX,event.clientX-r.left-r.width,0);
+    const dy=Math.max(r.top-event.clientY,event.clientY-r.top-r.height,0);
+    return Math.hypot(dx,dy)<=pixelScale*(retain?29:20);
+  }
+  function tickNearAttention(now) {
+    const eligible=!!gazePoint && !!cursorPoint && playStarted===null && petStarted===null && tailStarted===null &&
+      !featherPress&&!pounceHeld&&(!laneMotion||laneMotion.kind==='raised')&&
+      withinQuietReach(cursorPoint) && (!lastPose||['idle','walk','sprint','chase'].includes(lastPose.kind));
+    if(!eligible) {
+      if(nearAttention){
+        nearAttention=false;
+        const along=travel?(direction===1?currentX/travel:1-currentX/travel):0;
+        buildSequence(Math.max(0,Math.min(.999,along)));startedAt=now;lastPaint=-Infinity;
+      }
+      return false;
+    }
+    if(!nearAttention) {
+      nearAttention=true;nearLast=now;featherFollowing=false;walkAway=null;
+      if(lastPose&&['walk','sprint','chase'].includes(lastPose.kind)) {
+        poseHandoff={source:lastPose,start:now,last:now};stage.dataset.transition='settling';
+        return true;
+      }
+    }
+    startedAt+=Math.max(0,now-nearLast);nearLast=now;
+    if(now-lastPaint>=1000/60-.5){lastPaint=now;paint('idle',0);}
+    return true;
+  }
+
   function endFeatherFollow(now) {
     if (!featherFollowing) return;
     featherFollowing = false;
@@ -1460,11 +1506,12 @@
     const dt = Math.max(0, Math.min(.06, (now - followTime) / 1000));
     followTime = now;
     const delta = target - currentX;
-    const running=Math.abs(delta)>70;
-    const step = (running?30:8) * pixelScale * dt;
+    const speed=(8+22*easePose((Math.abs(delta)-25)/100))*pixelScale;
+    const running=speed>19*pixelScale;
+    const step = speed * dt;
     currentX += Math.sign(delta) * Math.min(Math.abs(delta), step);
     walkAway = null;
-    if (now - lastPaint >= 1000 / (Math.hypot(gazeX,gazeY)>.001?60:30) - .5) {
+    if (now - lastPaint >= 1000 / 60 - .5) {
       lastPaint = now;
       canvas.style.transform = `translate3d(${currentX}px,0,0) scaleX(${direction})`;
       paint(running?'sprint':'walk', 0);
@@ -1473,6 +1520,7 @@
   }
 
   function startInput(kind, event, now) {
+    nearAttention=false;
     if (laneMotion && laneMotion.kind!=='raised') return;
     featherFollowing = false;
     const current = petStarted !== null ? 'pet' : tailStarted !== null ? 'tail-enjoy' : playStarted !== null ? playKind : null;
@@ -1574,7 +1622,7 @@
       const target = featherTarget(event, 0);
       playTarget = playOrigin + Math.sign(target - playOrigin) * Math.min(70, Math.abs(target - playOrigin));
     } else if ((!laneMotion || laneMotion.kind==='raised') && !reducedMotion.matches && zone === 'front' && !event.buttons &&
-        playStarted === null && petStarted === null && tailStarted === null) {
+        playStarted === null && petStarted === null && tailStarted === null && !withinQuietReach(cursorPoint)) {
       if (!featherFollowing) followTime = now;
       if(!previousPoint||Math.hypot(event.clientX-previousPoint.clientX,event.clientY-previousPoint.clientY)>=1)lastFeatherMotion=now;
       featherFollowing = true;
@@ -1740,6 +1788,7 @@
       if(progress>=1)lastPose=null;
     },
     pause() {
+      nearAttention=false;
       resetGaze();
       featherPress=null;
       poseHandoff=null;
