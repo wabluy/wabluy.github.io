@@ -29,7 +29,7 @@
   portalBack.width=portalBack.height=200;portalBack.ariaHidden='true';portalBack.hidden=true;
   document.body.append(portalBack);
   const portalBackInk=portalBack.getContext?.('2d');
-  const portalTiming={settle:180,trace:1250,walk:1800,close:320,open:550};
+  const portalTiming={settle:180,trace:1250,walk:5600,close:320,open:550};
   const portalExit=portalTiming.settle+portalTiming.trace+portalTiming.walk+portalTiming.close;
   const desktop=matchMedia('(min-width: 1100px)');
   const sx=()=>window.scrollX||0, sy=()=>window.scrollY||0;
@@ -465,7 +465,7 @@
     const floor=Math.max(button.bottom+w*.22,w*.96)+sy();
     const holeX=goal-w*.45,holeY=floor-w*.025;
     const elapsed=Math.max(0,now-intro.start);
-    const open=550,out=1800,tap=700,turn=200,back=1800,close=320;
+    const open=550,out=2400,tap=700,turn=200,back=2400,close=320;
     const tapAt=open+out,turnAt=tapAt+tap,backAt=turnAt+turn,end=backAt+back;
     const fade=1-clamp((elapsed-end)/close,0,1);
     // Right-facing emergence and left-facing retreat share the same near lip.
@@ -474,7 +474,7 @@
     canvas.style.removeProperty('clip-path');canvas.style.opacity='1';
     if(elapsed<tapAt) {
       const p=smooth(clamp((elapsed-open)/out,0,1)),x=goal-w*1.4*(1-p);
-      floatCat(x,floor,'walk',0,0,56*p,1);
+      floatCat(x,floor,'sprint',0,0,56*p,1);
       portalOcclusion(x,floor,holeX,holeY,1,true);
       if(p===0)canvas.style.opacity='0';
     } else if(elapsed<turnAt) {
@@ -485,7 +485,7 @@
       floatCat(goal,floor,'turn',0,p,0,p<.5?1:-1);
     } else {
       const p=smooth(clamp((elapsed-backAt)/back,0,1)),x=goal-w*1.4*p;
-      floatCat(x,floor,'walk',0,0,56*p,-1);
+      floatCat(x,floor,'sprint',0,0,56*p,-1);
       portalOcclusion(x,floor,holeX,holeY,-1);
       if(p===1)canvas.style.opacity='0';
     }
@@ -582,7 +582,7 @@
     if(state.mode==='returning' && !portalWanted && !state.homeReserved){finishHidden();return;}
     const enter=elapsed-portalExit,holeX=goalX-w*.12;
     // Sample once per arrival. Neither a new frame nor a resize changes its mood.
-    if(!state.arrival)state.arrival={walk:3000+Math.random()*400,
+    if(!state.arrival)state.arrival={walk:5600+Math.random()*400,
       pause:Math.random()<.45?1500+Math.random()*500:0};
     if(state.arrival.segmented===undefined)state.arrival.segmented=state.arrival.pause>0;
     const arrival=state.arrival,approach=arrival.walk*.62,afterOpen=Math.max(0,enter-portalTiming.open);

@@ -1638,7 +1638,9 @@
       if (canvas.height !== height) { canvas.height=height;ctx.imageSmoothingEnabled=false; }
       if (height === 40) canvas.style.height=`${canvas.getBoundingClientRect().width}px`;
       else canvas.style.removeProperty('height');
-      direction=facing;gaitDistance=distance;
+      // Transport supplies travelled sprite pixels. Do not add the home lane's stale delta.
+      direction=facing;gaitDistance=distance;lastGaitX=currentX;
+      if(kind==='walk'||kind==='sprint')gaitBlend=kind==='sprint'?1:0;
       paint(kind,frame,progress);
     },
     resume(x, facing=direction) {
