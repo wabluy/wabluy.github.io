@@ -183,6 +183,7 @@ petCard.dataset.intro = 'pending';
 petCard.dataset.introSequence = '1';
 let catRestartTimer = 0;
 let catHovered = false;
+let catAutoPreview=false,catAutoPreviewTimer=0;
 let catPreviewSuppressed = false;
 let catHandledPointerClick = false;
 let catFocused = false;
@@ -195,7 +196,7 @@ let activeCatControl = null;
 const isCatControl = control => control === petButton;
 const catControl = () => activeCatControl || petButton;
 function updateCatInteraction() {
-  const preview = !catPreviewSuppressed && (catHovered || catPointer !== null || (compactProfile.matches && catFocused));
+  const preview = !catPreviewSuppressed && (catAutoPreview || catHovered || catPointer !== null || (compactProfile.matches && catFocused));
   petCard.dataset.open = String(preview);
   petCard.dataset.pinned = String(catPinned);
   petButton.setAttribute('aria-pressed', String(catPinned));
@@ -260,11 +261,15 @@ function scheduleCatRestart() {
   }, 10000);
 }
 function cancelCatIntro() {
+  clearTimeout(catAutoPreviewTimer);catAutoPreviewTimer=0;catAutoPreview=false;
   if (petCard.dataset.intro === 'pending') petCard.dataset.intro = 'cancelled';
 }
 petCard.addEventListener('catintroenable', () => {
   if (petCard.dataset.intro !== 'pending') return;
   petCard.dataset.intro = 'complete';
+  catAutoPreview=true;catPreviewSuppressed=false;
+  clearTimeout(catAutoPreviewTimer);
+  catAutoPreviewTimer=setTimeout(()=>{catAutoPreviewTimer=0;catAutoPreview=false;updateCatInteraction();},600);
   catPinned = true;
   scheduleCatRestart();
   updateCatInteraction();

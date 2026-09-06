@@ -42,6 +42,7 @@
   let introStarted=null;
   let portalWanted=true;
   let nextWanderAt=performance.now()+25000;
+  let homeRule=null;
   let state=null,holdTimer=0,lastTick=0,releasingCapture=false,lastHover=null;
   let viewportDirty=false,viewportChangedAt=0;
   function lineRect(element,edge='top') {
@@ -51,9 +52,17 @@
   }
   const homeRect=()=>{
     const r=lineRect(home);if(!r)return null;
-    const y=api.homeLineY?.(r.y)??r.y;
-    home.style.setProperty?.('--cat-home-rule-offset',`${y-r.y}px`);
-    return {...r,y};
+    const desired=(api.homeLineY?.(r.y)??r.y)-r.y,now=performance.now();
+    if(!state||!desktop.matches||!homeRule)homeRule={offset:desired,target:desired};
+    else {
+      if(Math.abs(desired-homeRule.target)>.1)homeRule={offset:homeRule.offset,from:homeRule.offset,target:desired,start:now,duration:desired>homeRule.offset?430:300};
+      if(homeRule.start!==undefined){
+        const p=clamp((now-homeRule.start)/homeRule.duration,0,1);
+        homeRule.offset=homeRule.from+(homeRule.target-homeRule.from)*(homeRule.target>homeRule.from?p*p:smooth(p));
+      }
+    }
+    home.style.setProperty?.('--cat-home-rule-offset',`${homeRule.offset}px`);
+    return {...r,y:r.y+homeRule.offset};
   };
   function targets() {
     const items=[{id:'home',element:home},
@@ -484,6 +493,19 @@
     let r=state.excursion?currentLine(state.excursion.target):homeRect();
     if(!r&&state.excursion){delete state.excursion;r=homeRect();}
     if(!r){cancel();return;}
+    if(state.mode!=='exiting'&&elapsed>=portalExit&&!state.arrivalVisible) {
+      const homeTarget=!state.excursion||state.excursion.target.id==='home';
+      const waitingPhoto=homeTarget&&desktop.matches&&introCard?.dataset.lanePreview==='true'&&introCard.dataset.open==='false';
+      const movingHome=homeTarget&&desktop.matches&&homeRule&&Math.abs(homeRule.target-homeRule.offset)>.1;
+      if(!state.destinationSample)state.destinationSample={y:r.y,time:now-100};
+      else if(Math.abs(r.y-state.destinationSample.y)>.1)state.destinationSample={y:r.y,time:now};
+      const movingLine=now-state.destinationSample.time<100;
+      if(waitingPhoto||movingHome||movingLine){
+        state.start=now-(state.mode==='entering'?0:portalExit);
+        setLine(r);
+        canvas.style.opacity='0';hole.hidden=portalCanvas.hidden=portalBack.hidden=true;return;
+      }
+    }
     if(state.mode!=='exiting' && elapsed>=portalExit && (portalWanted||state.homeReserved)) {
       const target=state.excursion?.target||{id:'home',element:home};
       if(state.reservedTarget!==target.element) {
@@ -545,6 +567,7 @@
     else if(afterOpen<approach)along=.62*smooth(clamp(afterOpen/approach,0,1));
     else if(grooming)along=.62;
     else along=.62+.38*smooth(clamp((afterOpen-approach-arrival.pause)/(arrival.walk-approach),0,1));
+    if(along>0)state.arrivalVisible=true;
     const left=goalX-w*1.4*(1-along),finished=portalTiming.open+arrival.walk+arrival.pause;
     const opening=clamp(enter/portalTiming.open,0,1),fade=1-clamp((enter-finished)/portalTiming.close,0,1);
     showHole(holeX,r.y,opening,enter/1000,fade,false);
