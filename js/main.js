@@ -189,23 +189,36 @@ let catFocused = false;
 let catPointer = null;
 let catInteracting = false;
 let previousCatPreview = false;
+let catLaneTimer = 0, catLaneSettleTimer = 0, catLaneSettling = false;
+petCard.dataset.lanePreview = 'false';
 let activeCatControl = null;
 const isCatControl = control => control === petButton;
 const catControl = () => activeCatControl || petButton;
 function updateCatInteraction() {
   const preview = !catPreviewSuppressed && (catHovered || catPointer !== null || (compactProfile.matches && catFocused));
-  const active = preview || catPinned || petCard.dataset.intro === 'pending';
   petCard.dataset.open = String(preview);
   petCard.dataset.pinned = String(catPinned);
   petButton.setAttribute('aria-pressed', String(catPinned));
   petButton.setAttribute('data-pressing', String(catPointer !== null));
   petButton.setAttribute('aria-expanded', String(preview));
-  petCard.dataset.interacting = String(active);
   petCard.dataset.dismissed = String(catPreviewSuppressed && !catPinned);
   if (preview !== previousCatPreview) {
     previousCatPreview = preview;
-    petCard.dispatchEvent(new Event(preview ? 'catlaneraise' : 'catlanelower'));
+    clearTimeout(catLaneTimer);catLaneTimer = 0;
+    clearTimeout(catLaneSettleTimer);catLaneSettleTimer = 0;catLaneSettling = false;
+    if (preview) {
+      petCard.dataset.lanePreview = 'true';
+      petCard.dispatchEvent(new Event('catlaneraise'));
+    } else if (!compactProfile.matches && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      catLaneTimer = setTimeout(finishCatPhotoFade, 4050);
+    } else {
+      petCard.dataset.lanePreview = 'false';
+      petCard.dispatchEvent(new Event('catlanelower'));
+    }
   }
+  const active = preview || catPinned || petCard.dataset.intro === 'pending' ||
+    (!compactProfile.matches && (petCard.dataset.lanePreview === 'true' || catLaneSettling));
+  petCard.dataset.interacting = String(active);
   if (active === catInteracting) return;
   catInteracting = active;
   if (active) {
@@ -213,6 +226,20 @@ function updateCatInteraction() {
   }
   petCard.dispatchEvent(new Event(active ? 'catpreviewstart' : 'catpreviewend'));
 }
+function finishCatPhotoFade() {
+  if (previousCatPreview || petCard.dataset.lanePreview !== 'true') return;
+  clearTimeout(catLaneTimer);catLaneTimer = 0;
+  petCard.dataset.lanePreview = 'false';
+  catLaneSettling = !compactProfile.matches;
+  petCard.dispatchEvent(new Event('catlanelower'));
+  if (catLaneSettling) catLaneSettleTimer = setTimeout(() => {
+    catLaneSettling = false;catLaneSettleTimer = 0;updateCatInteraction();
+  }, 450);
+  updateCatInteraction();
+}
+petCard.querySelector('.pet-portrait')?.addEventListener('transitionend', event => {
+  if (event.target === event.currentTarget && event.propertyName === 'opacity' && !previousCatPreview) finishCatPhotoFade();
+});
 function closeCatInteraction() {
   catHovered = catFocused = false;
   catPointer = null;

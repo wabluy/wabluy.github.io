@@ -1022,8 +1022,8 @@
     // event received during entry/drag must never leave a raised, empty lane.
     if (desktopLane.matches) {
       const raised = laneMotion && ['rising', 'raised'].includes(laneMotion.kind);
-      if (pet.dataset.open === 'true' && !raised) raiseLane();
-      else if (pet.dataset.open !== 'true' && raised) lowerLane();
+      if ((pet.dataset.lanePreview ?? pet.dataset.open) === 'true' && !raised) raiseLane();
+      else if ((pet.dataset.lanePreview ?? pet.dataset.open) !== 'true' && raised) lowerLane();
     }
     if (tickPoseHandoff(now)) { frameRequest=requestAnimationFrame(tick);return; }
     if (tickLane(now)) { if (active) frameRequest = requestAnimationFrame(tick); return; }
@@ -1468,7 +1468,7 @@
   stage.catTransport = {
     install(driver) { transportDriver = driver; if(active)driver.appear(); },
     hide: stop,
-    presented() { if(pet.dataset.open==='true')raiseLane(); },
+    presented() { if((pet.dataset.lanePreview??pet.dataset.open)==='true')raiseLane(); },
     active: () => active,
     interacting: (now = performance.now()) => active && (pounceHeld || pendingInput !== null ||
       playStarted !== null || petStarted !== null || tailStarted !== null || now-lastInteractionMove < 200),
