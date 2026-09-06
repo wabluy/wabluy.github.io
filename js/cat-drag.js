@@ -83,12 +83,25 @@
   }
   const currentLine=item=>item.id==='home'?homeRect():lineRect(item.element,item.edge);
   function visibleLine(r) {
-    return !!r && r.y-sy()>=width()*.7 && r.y-sy()<=innerHeight-8;
+    const nav=document.querySelector('.topbar')?.getBoundingClientRect();
+    const top=Math.max(0,nav?.bottom||0)+width()*.7;
+    return !!r && r.y-sy()>=top && r.y-sy()<=innerHeight-8;
   }
   function viewportTarget() {
-    if(visibleLine(homeRect()))return {id:'home',element:home};
-    return targets().filter(item=>visibleLine(item.rect))
+    // The desktop sidebar is a separate habitat. Content-lane residents follow
+    // only real section boundaries, never navigation or profile decoration.
+    const sidebarResident=desktop.matches&&(!state||state.target?.id==='home'||
+      (state.mode==='entering'&&!state.excursion));
+    if(sidebarResident&&visibleLine(homeRect()))return {id:'home',element:home};
+    return targets().filter(item=>!['header','profile'].includes(item.id)&&(!desktop.matches||item.id!=='home'))
+      .map(item=>({...item,rect:currentLine(item)}))
+      .filter(item=>visibleLine(item.rect))
       .sort((a,b)=>b.rect.y-a.rect.y)[0]||null;
+  }
+  function waitForViewport() {
+    clearDecorations();reserveLine(null);homeVacant(true);api.pause();
+    state={mode:'viewport-wait'};
+    canvas.style.opacity='0';canvas.style.pointerEvents='none';
   }
   function resident(target) {
     return target.id==='home'?null:{mode:'parked',target,deadline:Infinity,viewportFollow:true};
@@ -109,22 +122,28 @@
     state.excursion={target,parked:resident(target),fraction:.2+Math.random()*.6};
     if(follow)state.viewportTransfer=true;
   }
-  function viewportChanged() {viewportDirty=true;}
+  function viewportChanged() {
+    viewportDirty=true;
+    if(!state||['arming','dragging','landing','intro','prank'].includes(state.mode))return;
+    // Fixed transport layers must not retain the previous scroll frame's pixels.
+    canvas.style.opacity='0';hole.hidden=portalCanvas.hidden=portalBack.hidden=true;
+  }
   function followViewport(now) {
     if(!portalWanted||!api.active()||state?.platformMotion||!viewportDirty)return;
-    const transferring=state?.viewportTransfer&&['entering','returning'].includes(state.mode);
-    if(state&&state.mode!=='parked'&&!transferring)return;
+    const transferring=state&&['entering','returning'].includes(state.mode);
+    if(state&&state.mode!=='parked'&&state.mode!=='viewport-wait'&&!transferring)return;
     if(api.interacting?.(now))return;
-    const target=viewportTarget();if(!target)return;
-    viewportDirty=false;
-    if(transferring) {
-      const destination=state.excursion?.target||{id:'home',element:home};
-      if(!visibleLine(currentLine(destination)))enterViewport(target,now);
+    const target=viewportTarget();viewportDirty=false;
+    if(!target){waitForViewport();return;}
+    const current=transferring?(state.excursion?.target||{id:'home',element:home}):
+      state?.target||{id:'home',element:home};
+    if(state?.mode!=='viewport-wait'&&current.element===target.element){
+      if(state?.mode==='parked'){setLine(currentLine(current));canvas.style.opacity='1';}
       return;
     }
-    const current=state?.target||{id:'home',element:home};
-    if(current.element===target.element)return;
-    portalTo(target,now,true);
+    // Scrolling changes the visible habitat immediately; do not play a departure
+    // on a source that the reader has already moved away from.
+    enterViewport(target,now);
   }
 
   function nearbyControl(point) {
@@ -421,7 +440,7 @@
     state=null;restoreHome();homeVacant(true);api.hide();
   }
   function appear() {
-    portalWanted=true;
+    portalWanted=true;viewportDirty=false;layoutFollowUntil=0;
     restoreHome();homeVacant(true);api.pause();
     if(introCard?.dataset.intro==='pending' && introStarted!==introCard.dataset.introSequence && introButton) {
       introStarted=introCard.dataset.introSequence;
@@ -432,10 +451,9 @@
       introCard.dispatchEvent(new Event('catintroenable'));
     }
     state={mode:'entering',start:performance.now(),entryFraction:Math.random()};
-    if(!visibleLine(homeRect())) {
-      const target=viewportTarget();
-      if(target){state.excursion={target,parked:resident(target)};state.viewportTransfer=true;}
-    }
+    const target=visibleLine(homeRect())?{id:'home',element:home}:viewportTarget();
+    if(!target){waitForViewport();return;}
+    if(target.id!=='home'){state.excursion={target,parked:resident(target)};state.viewportTransfer=true;}
     canvas.style.pointerEvents='none';
     // Establish the clipped first frame before the browser can paint the sprite.
     tickPortal(state.start);
@@ -449,6 +467,7 @@
         (!state || state.mode==='parked')) returnHome(performance.now(),'exiting');
       return;
     } // An exit already underway finishes before the latest reopening.
+    if(state?.mode==='viewport-wait'){finishHidden();return;}
     if(state&&['intro','entering','exiting','returning','landing'].includes(state.mode))return;
     if(state?.mode==='dragging'){release({pointerId:state.pointerId},true);return;}
     if(state?.mode==='arming') {
@@ -621,6 +640,7 @@
       if(!hint.hidden&&lastHover){if(api.hitScruff(lastHover))showHint(api.scruffPoint());else hint.hidden=true;}
       return false;
     }
+    if(state.mode==='viewport-wait')return true;
     if(state.mode==='arming') {
       showHint(state.origin,clamp((now-state.pressStart)/holdDuration,0,1));return true;
     }
@@ -664,7 +684,7 @@
         if(returnTarget.id==='home')returnHome(now);else portalTo(returnTarget,now);
         return true;
       }
-      setLine(r);
+      setLine(r);canvas.style.opacity='1';
       if(state.platformMotion) {
         const motion=state.platformMotion,elapsed=now-motion.start;
         if(elapsed < motion.duration) {
