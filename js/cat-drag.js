@@ -92,7 +92,10 @@
     return !!r && r.y-sy()>=top && r.y-sy()<=innerHeight-8;
   }
   const standingTarget=()=>state?.mode==='parked'?state.target:!state?{id:'home',element:home}:null;
-  function residentVisible(r) {
+  function residentVisible(r,target=null) {
+    // The header is a deliberate drop target, not content scrolling behind
+    // the sticky navigation. Its cat stands in front of the controls.
+    if(target?.id==='header')return !!r&&r.y-sy()>0&&r.y-sy()-width()*.7<innerHeight;
     const nav=document.querySelector('.topbar')?.getBoundingClientRect();
     return !!r&&r.y-sy()>Math.max(0,nav?.bottom||0)&&r.y-sy()-width()<innerHeight;
   }
@@ -106,7 +109,7 @@
     }
     if(performance.now()<fallbackAt)return current;
     if((current?.id==='home'&&residentVisible(homeRect()))||visibleLine(homeRect()))return {id:'home',element:home};
-    if(current&&residentVisible(currentLine(current)))return current;
+    if(current&&residentVisible(currentLine(current),current))return current;
     return targets().filter(item=>!['header','profile'].includes(item.id)&&(!desktop.matches||item.id!=='home'))
       .map(item=>({...item,rect:currentLine(item)})).filter(item=>visibleLine(item.rect))
       .sort((a,b)=>b.rect.y-a.rect.y)[0]||current;
@@ -128,7 +131,7 @@
   }
   function portalTo(target,now,follow=false) {
     const origin=currentLine(state?.target||{id:'home',element:home});
-    if(follow&&!residentVisible(origin)){enterViewport(target,now);return;}
+    if(follow&&!residentVisible(origin,state?.target)){enterViewport(target,now);return;}
     returnHome(now);
     // A transported sprite may still have its previous frame's screen position
     // immediately after scrolling. Anchor departure to the real document line.
@@ -211,9 +214,9 @@
   }
   function setLine(r) {
     const w=width();externalBox(r.left,r.y-w*.7,r.width,w*.7);canvas.style.removeProperty('bottom');
-    canvas.style.opacity=residentVisible(r)?'1':'0';
+    canvas.style.opacity=residentVisible(r,state?.target)?'1':'0';
     const nav=document.querySelector('.topbar')?.getBoundingClientRect();
-    const crop=Math.max(0,(nav?.bottom||0)-(r.y-sy()-w*.7));
+    const crop=state?.target?.id==='header'?0:Math.max(0,(nav?.bottom||0)-(r.y-sy()-w*.7));
     stage.style.clipPath=`inset(${crop}px -120px -120px -120px)`;
   }
   function floatCat(left,bottom,kind,frame=0,progress=0,distance=0,facing=1) {
@@ -723,7 +726,8 @@
       }
       const returnTarget=(selectedSection&&targets().find(item=>item.id===selectedSection))||state.returnTarget||{id:'home',element:home};
       if(!state.viewportFollow&&now>=state.deadline&&returnTarget.element===state.target.element){state.viewportFollow=true;state.deadline=Infinity;}
-      if(!state.viewportFollow&&now>=state.deadline&&visibleLine(r)&&visibleLine(currentLine(returnTarget))){
+      const originVisible=state.target.id==='header'?residentVisible(r,state.target):visibleLine(r);
+      if(!state.viewportFollow&&now>=state.deadline&&originVisible&&visibleLine(currentLine(returnTarget))){
         if(returnTarget.id==='home')returnHome(now);else portalTo(returnTarget,now);
         return true;
       }
