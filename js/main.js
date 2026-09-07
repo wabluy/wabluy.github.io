@@ -334,6 +334,7 @@ document.addEventListener('pointerup', event => {
   catFocused = false;
   if (event.pointerType !== 'mouse') catHovered = false;
   updateCatInteraction();
+  if (catPinned) petCard.dispatchEvent(new Event('catpreviewstart'));
 }, true);
 document.addEventListener('pointercancel', event => {
   catHandledPointerClick = false;
@@ -457,4 +458,3 @@ backgroundSummary.addEventListener('click', event => {
 });
 compactProfile.addEventListener('change', updateBackgroundVisibility);
 updateBackgroundVisibility();
-

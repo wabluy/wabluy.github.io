@@ -1349,7 +1349,9 @@
     if (active) { transportDriver?.setVisible(true); return; }
     if (document.hidden || !stage.isConnected) return;
     const bounds = stage.getBoundingClientRect();
-    if ((!bounds.width || !bounds.height || bounds.bottom < 0 || bounds.top > innerHeight) && pet.dataset.intro!=='pending') return;
+    if (!bounds.width || !bounds.height) return;
+    // The transport chooses a visible content line when the home has scrolled away.
+    if (!transportDriver && (bounds.bottom < 0 || bounds.top > innerHeight) && pet.dataset.intro!=='pending') return;
     active = true;
     measure();
     stage.classList.add('is-active');
