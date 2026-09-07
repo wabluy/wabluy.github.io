@@ -431,3 +431,19 @@ footer { padding-block: 22px 28px; font-size: .75rem; }
   .work-entry > p, .news-list li > div { font-size: var(--type-body); line-height: 1.78; text-wrap: pretty; }
   .about p:lang(zh-CN) { text-align: justify; text-align-last: start; line-break: strict; }
 }
+
+/* Fill narrow prose lines using language-aware word breaks, keeping the final line natural. */
+.about [data-i18n='intro'], .about .background-details > p,
+.work-entry > p, .news-list li > div { -webkit-hyphens: none; hyphens: none; }
+@media (max-width: 600px), (min-width: 601px) and (max-width: 1099px) and (max-height: 500px) and (orientation: landscape) {
+  .about [data-i18n='intro'], .about .background-details > p,
+  .work-entry > p, .news-list li > div {
+    text-align: justify;
+    text-align-last: start;
+    text-wrap: wrap;
+    -webkit-hyphens: auto;
+    hyphens: auto;
+    hyphenate-limit-chars: 7 3 3;
+    word-break: normal;
+  }
+}
