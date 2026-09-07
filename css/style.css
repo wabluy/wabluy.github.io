@@ -447,11 +447,16 @@ footer { padding-block: 22px 28px; font-size: .75rem; }
     word-break: normal;
   }
 }
-/* Chinese glyphs keep their natural spacing; English prose retains justification. */
+/* Keep Chinese names and short terms intact without stretching glyph spacing. */
 .about p:lang(zh-CN) {
   text-align: start;
   text-align-last: auto;
-  text-wrap: pretty;
+  text-wrap: wrap;
+  word-break: normal;
+  line-break: strict;
   -webkit-hyphens: none;
   hyphens: none;
 }
+
+.about .zh-unit { white-space: nowrap; }
+.role:lang(zh-CN) { text-wrap: balance; }
