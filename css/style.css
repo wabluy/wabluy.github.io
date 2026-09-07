@@ -293,7 +293,7 @@ body { font-family: var(--font); }
 }
 .header-actions svg { stroke-width: 1.4; }
 .about [data-i18n='intro'] {
-  max-width: 66ch;
+  max-width: none;
   color: var(--intro-text);
   font-family: var(--font);
   font-size: var(--type-body);
@@ -460,3 +460,25 @@ footer { padding-block: 22px 28px; font-size: .75rem; }
 
 .about .zh-unit { white-space: nowrap; }
 .role:lang(zh-CN) { text-wrap: balance; }
+
+/* Desktop prose follows the same column edges in both languages. */
+@media (min-width: 1100px) {
+  .about [data-i18n='intro'], .about .background-details > p,
+  .work-entry > p, .news-list li > div {
+    text-align: justify;
+    text-align-last: start;
+    text-wrap: pretty;
+    -webkit-hyphens: auto;
+    hyphens: auto;
+    hyphenate-limit-chars: 7 3 3;
+    word-break: normal;
+  }
+  .about p:lang(zh-CN) {
+    text-align: justify;
+    text-align-last: start;
+    text-justify: inter-character;
+    text-wrap: wrap;
+    -webkit-hyphens: none;
+    hyphens: none;
+  }
+}
